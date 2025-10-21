@@ -72,4 +72,3 @@ struct MainTabView: View {
     MainTabView()
         .environmentObject(AuthService())
 }
-

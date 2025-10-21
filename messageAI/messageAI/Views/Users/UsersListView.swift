@@ -20,8 +20,7 @@ struct UsersListView: View {
 
     @State private var searchText = ""
     @State private var selectedUser: User?
-    @State private var selectedConversation: Conversation?
-    @State private var showChat = false
+    @State private var navigationPath = NavigationPath()
     @State private var isCreatingConversation = false
     @State private var showError = false
     @State private var errorMessage: String?
@@ -31,7 +30,7 @@ struct UsersListView: View {
     @State private var conversationService: ConversationService?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 // Background
                 UIStyleGuide.Colors.background
@@ -104,10 +103,11 @@ struct UsersListView: View {
             .onChange(of: searchText) { _, newValue in
                 viewModel.searchQuery = newValue
             }
-            .sheet(isPresented: $showChat) {
-                if let conversation = selectedConversation {
-                    chatViewPlaceholder(conversation: conversation)
-                }
+            .navigationDestination(for: String.self) { conversationId in
+                ChatView(
+                    conversationId: conversationId,
+                    localStorageService: LocalStorageService(modelContext: modelContext)
+                )
             }
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) {
@@ -126,48 +126,6 @@ struct UsersListView: View {
         }
     }
 
-    // MARK: - Chat View Placeholder
-
-    private func chatViewPlaceholder(conversation: Conversation) -> some View {
-        NavigationStack {
-            VStack(spacing: UIStyleGuide.Spacing.lg) {
-                Spacer()
-
-                Image(systemName: "ellipsis.message.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(UIStyleGuide.Colors.primary)
-
-                Text("Chat View")
-                    .font(UIStyleGuide.Typography.title)
-                    .foregroundColor(UIStyleGuide.Colors.textPrimary)
-
-                Text("Coming in PR #13")
-                    .font(UIStyleGuide.Typography.body)
-                    .foregroundColor(UIStyleGuide.Colors.textSecondary)
-
-                if let userName = selectedUser?.displayName {
-                    Text(userName)
-                        .font(UIStyleGuide.Typography.bodyBold)
-                        .foregroundColor(UIStyleGuide.Colors.textPrimary)
-                        .padding(.top, UIStyleGuide.Spacing.md)
-                }
-
-                Spacer()
-            }
-            .navigationTitle(selectedUser?.displayName ?? "Chat")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showChat = false
-                    } label: {
-                        Image(systemName: "xmark")
-                            .foregroundColor(UIStyleGuide.Colors.textPrimary)
-                    }
-                }
-            }
-        }
-    }
 
     // MARK: - Helper Methods
 
@@ -199,13 +157,10 @@ struct UsersListView: View {
                     participantIds: [currentUserId, user.id]
                 )
 
-                // Get the full conversation object
-                let conversation = try await service.getConversation(id: conversationId)
-
+                // Navigate to chat
                 await MainActor.run {
                     isCreatingConversation = false
-                    selectedConversation = conversation
-                    showChat = true
+                    navigationPath.append(conversationId)
                 }
             } catch {
                 await MainActor.run {
@@ -230,4 +185,3 @@ struct UsersListView: View {
     UsersListView()
         .environmentObject(AuthService())
 }
-

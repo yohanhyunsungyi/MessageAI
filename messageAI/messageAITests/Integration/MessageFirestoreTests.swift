@@ -383,5 +383,3 @@ final class MessageFirestoreTests: FirebaseIntegrationTestCase {
         }
     }
 }
-
-

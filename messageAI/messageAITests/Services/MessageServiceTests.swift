@@ -389,5 +389,3 @@ final class MessageExtensionTests: XCTestCase {
         XCTAssertEqual(dict["localId"] as? String, localId)
     }
 }
-
-

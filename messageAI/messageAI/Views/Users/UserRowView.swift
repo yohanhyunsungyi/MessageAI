@@ -126,4 +126,3 @@ struct UserRowView: View {
     .padding()
     .background(UIStyleGuide.Colors.cardBackground)
 }
-

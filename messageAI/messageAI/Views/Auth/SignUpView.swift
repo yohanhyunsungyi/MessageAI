@@ -55,7 +55,7 @@ struct SignUpView: View {
                 )
             }
 
-            // Confirm Password  
+            // Confirm Password
             VStack(alignment: .leading, spacing: 8) {
                 Text("Confirm Password")
                     .font(.system(size: 13, weight: .medium))
@@ -143,4 +143,3 @@ struct SignUpView: View {
 #Preview("Sign Up") {
     SignUpView(viewModel: AuthViewModel())
 }
-

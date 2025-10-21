@@ -221,5 +221,3 @@ struct ConversationRowView: View {
     }
     .background(UIStyleGuide.Colors.background)
 }
-
-

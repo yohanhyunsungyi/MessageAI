@@ -15,20 +15,36 @@ import Combine
 class LocalStorageService: ObservableObject {
     private let modelContext: ModelContext
 
+    /// Initialize with existing ModelContext
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
+    }
+
+    /// Initialize with default ModelContainer
+    convenience init() {
+        let schema = Schema([
+            LocalMessage.self,
+            LocalConversation.self
+        ])
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+
+        do {
+            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            self.init(modelContext: container.mainContext)
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
     }
 
     // MARK: - Message Operations
 
     /// Save a message to local storage
     func saveMessage(_ message: Message, conversationId: String) throws {
-        // Check if message already exists
-        let descriptor = FetchDescriptor<LocalMessage>(
-            predicate: #Predicate { $0.id == message.id }
-        )
-        
-        if let existingMessage = try modelContext.fetch(descriptor).first {
+        // Fetch all and filter in Swift (avoids predicate crashes)
+        let descriptor = FetchDescriptor<LocalMessage>()
+        let allMessages = try modelContext.fetch(descriptor)
+
+        if let existingMessage = allMessages.first(where: { $0.id == message.id }) {
             // Update existing message
             existingMessage.conversationId = conversationId
             existingMessage.senderId = message.senderId
@@ -53,51 +69,76 @@ class LocalStorageService: ObservableObject {
             )
             modelContext.insert(localMessage)
         }
-        
+
         try modelContext.save()
     }
 
     /// Fetch messages for a specific conversation
     func fetchMessages(conversationId: String) throws -> [LocalMessage] {
-        let descriptor = FetchDescriptor<LocalMessage>(
-            predicate: #Predicate { $0.conversationId == conversationId },
-            sortBy: [SortDescriptor(\.timestamp, order: .forward)]
-        )
+        print("🔍 Fetching messages for conversation: \(conversationId)")
 
-        return try modelContext.fetch(descriptor)
+        do {
+            // Fetch ALL messages without predicate (avoids SwiftData crashes)
+            let descriptor = FetchDescriptor<LocalMessage>()
+            let allMessages = try modelContext.fetch(descriptor)
+            print("✅ Fetched \(allMessages.count) total messages from store")
+
+            // Filter and sort in Swift
+            let filteredMessages = allMessages
+                .filter { $0.conversationId == conversationId }
+                .sorted { $0.timestamp < $1.timestamp }
+
+            print("✅ Found \(filteredMessages.count) messages for conversation")
+            return filteredMessages
+        } catch {
+            print("❌ Error fetching messages: \(error)")
+            // Try to recover by clearing data
+            try? clearAllData()
+            return []
+        }
     }
 
     /// Fetch all messages
     func fetchAllMessages() throws -> [LocalMessage] {
-        let descriptor = FetchDescriptor<LocalMessage>(
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-        )
-
-        return try modelContext.fetch(descriptor)
+        do {
+            let descriptor = FetchDescriptor<LocalMessage>()
+            let messages = try modelContext.fetch(descriptor)
+            // Sort in Swift
+            return messages.sorted { $0.timestamp > $1.timestamp }
+        } catch {
+            print("❌ Error fetching all messages: \(error)")
+            try? clearAllData()
+            return []
+        }
     }
 
     /// Update message status
     func updateMessageStatus(messageId: String, status: MessageStatus) throws {
-        let descriptor = FetchDescriptor<LocalMessage>(
-            predicate: #Predicate { $0.id == messageId }
-        )
+        do {
+            // Fetch all and filter in Swift
+            let descriptor = FetchDescriptor<LocalMessage>()
+            let allMessages = try modelContext.fetch(descriptor)
 
-        guard let message = try modelContext.fetch(descriptor).first else {
-            throw LocalStorageError.messageNotFound
+            guard let message = allMessages.first(where: { $0.id == messageId }) else {
+                throw LocalStorageError.messageNotFound
+            }
+
+            message.status = status.rawValue
+            message.isPending = (status == .sending || status == .failed)
+            try modelContext.save()
+        } catch {
+            print("❌ Error updating message status: \(error)")
+            throw error
         }
-
-        message.status = status.rawValue
-        message.isPending = (status == .sending || status == .failed)
-        try modelContext.save()
     }
 
     /// Update message with server ID after sync
     func updateMessageId(localId: String, serverId: String, status: MessageStatus) throws {
-        let descriptor = FetchDescriptor<LocalMessage>(
-            predicate: #Predicate { $0.localId == localId }
-        )
+        // Fetch all and filter in Swift
+        let descriptor = FetchDescriptor<LocalMessage>()
+        let allMessages = try modelContext.fetch(descriptor)
 
-        guard let message = try modelContext.fetch(descriptor).first else {
+        guard let message = allMessages.first(where: { $0.localId == localId }) else {
             throw LocalStorageError.messageNotFound
         }
 
@@ -109,11 +150,11 @@ class LocalStorageService: ObservableObject {
 
     /// Delete a message
     func deleteMessage(messageId: String) throws {
-        let descriptor = FetchDescriptor<LocalMessage>(
-            predicate: #Predicate { $0.id == messageId }
-        )
+        // Fetch all and filter in Swift
+        let descriptor = FetchDescriptor<LocalMessage>()
+        let allMessages = try modelContext.fetch(descriptor)
 
-        guard let message = try modelContext.fetch(descriptor).first else {
+        guard let message = allMessages.first(where: { $0.id == messageId }) else {
             throw LocalStorageError.messageNotFound
         }
 
@@ -136,62 +177,105 @@ class LocalStorageService: ObservableObject {
 
     /// Save a conversation to local storage
     func saveConversation(_ conversation: Conversation) throws {
-        // Check if conversation already exists
-        let descriptor = FetchDescriptor<LocalConversation>(
-            predicate: #Predicate { $0.id == conversation.id }
-        )
-        
-        if let existingConversation = try modelContext.fetch(descriptor).first {
-            // Update existing conversation
-            existingConversation.participantIds = conversation.participantIds
-            existingConversation.lastMessage = conversation.lastMessage
-            existingConversation.lastMessageTimestamp = conversation.lastMessageTimestamp
-            existingConversation.type = conversation.type.rawValue
-            existingConversation.groupName = conversation.groupName
-        } else {
-            // Insert new conversation
-            let localConversation = LocalConversation(
-                id: conversation.id,
-                participantIds: conversation.participantIds,
-                lastMessage: conversation.lastMessage,
-                lastMessageTimestamp: conversation.lastMessageTimestamp,
-                type: conversation.type.rawValue,
-                groupName: conversation.groupName
-            )
-            modelContext.insert(localConversation)
+        print("💾 Saving conversation: \(conversation.id)")
+
+        guard let localConversation = LocalConversation.from(conversation) else {
+            print("❌ Failed to convert Conversation to LocalConversation")
+            throw LocalStorageError.saveFailed
         }
-        
-        try modelContext.save()
+
+        do {
+            // Fetch all to avoid predicate issues
+            let descriptor = FetchDescriptor<LocalConversation>()
+            let allConversations = try modelContext.fetch(descriptor)
+
+            // Check if already exists
+            if let existing = allConversations.first(where: { $0.id == conversation.id }) {
+                print("📝 Updating existing conversation")
+                // Delete old and insert new (safer than updating all fields)
+                modelContext.delete(existing)
+            } else {
+                print("➕ Inserting new conversation")
+            }
+
+            // Insert the new/updated conversation
+            modelContext.insert(localConversation)
+            try modelContext.save()
+            print("✅ Successfully saved conversation")
+        } catch {
+            print("❌ Error saving conversation: \(error)")
+            throw error
+        }
     }
 
     /// Fetch all conversations
-    func fetchConversations() throws -> [LocalConversation] {
-        let descriptor = FetchDescriptor<LocalConversation>()
-        let conversations = try modelContext.fetch(descriptor)
-        
-        // Sort in Swift to handle optional lastMessageTimestamp
-        return conversations.sorted { conv1, conv2 in
-            // Put conversations with timestamps first, sorted newest to oldest
-            switch (conv1.lastMessageTimestamp, conv2.lastMessageTimestamp) {
-            case (.some(let date1), .some(let date2)):
-                return date1 > date2
-            case (.some, .none):
-                return true  // Conversations with messages come first
-            case (.none, .some):
-                return false
-            case (.none, .none):
-                return false // Both nil, maintain order
+    func fetchConversations() -> [LocalConversation] {
+        print("🔍 Fetching all conversations from local storage...")
+
+        do {
+            let descriptor = FetchDescriptor<LocalConversation>()
+            let conversations = try modelContext.fetch(descriptor)
+            print("✅ Successfully fetched \(conversations.count) conversations")
+
+            // Sort in Swift to handle optional lastMessageTimestamp
+            return conversations.sorted { conv1, conv2 in
+                // Put conversations with timestamps first, sorted newest to oldest
+                switch (conv1.lastMessageTimestamp, conv2.lastMessageTimestamp) {
+                case (.some(let date1), .some(let date2)):
+                    return date1 > date2
+                case (.some, .none):
+                    return true  // Conversations with messages come first
+                case (.none, .some):
+                    return false
+                case (.none, .none):
+                    return false // Both nil, maintain order
+                }
             }
+        } catch {
+            print("❌ FATAL ERROR fetching conversations: \(error)")
+            print("🆘 This indicates SwiftData store corruption")
+            print("🗑️  Attempting emergency data clear...")
+
+            // Emergency recovery
+            do {
+                try clearAllData()
+                print("✅ Successfully cleared all corrupted data")
+            } catch let clearError {
+                print("❌ Failed to clear data: \(clearError)")
+            }
+
+            return []
         }
     }
 
     /// Fetch a specific conversation
-    func fetchConversation(id: String) throws -> LocalConversation? {
-        let descriptor = FetchDescriptor<LocalConversation>(
-            predicate: #Predicate { $0.id == id }
-        )
+    func fetchConversation(id: String) -> LocalConversation? {
+        print("🔍 Attempting to fetch conversation: \(id)")
 
-        return try modelContext.fetch(descriptor).first
+        do {
+            // Fetch ALL conversations first (safer than predicate on corrupted data)
+            print("📦 Fetching all conversations...")
+            let allDescriptor = FetchDescriptor<LocalConversation>()
+            let allConversations = try modelContext.fetch(allDescriptor)
+            print("✅ Fetched \(allConversations.count) total conversations")
+
+            // Filter in Swift (avoids SwiftData predicate crashes)
+            let result = allConversations.first { $0.id == id }
+            print(result != nil ? "✅ Found conversation \(id)" : "❌ Conversation \(id) not found")
+            return result
+        } catch {
+            print("❌ Fatal error fetching conversations: \(error)")
+            print("🗑️  Clearing ALL local data to recover...")
+
+            // Emergency recovery: clear all data
+            do {
+                try clearAllData()
+                print("✅ Successfully cleared all corrupted data")
+            } catch {
+                print("❌ Failed to clear data: \(error)")
+            }
+            return nil
+        }
     }
 
     /// Update conversation's last message
@@ -200,11 +284,11 @@ class LocalStorageService: ObservableObject {
         lastMessage: String,
         timestamp: Date
     ) throws {
-        let descriptor = FetchDescriptor<LocalConversation>(
-            predicate: #Predicate { $0.id == conversationId }
-        )
+        // Fetch all and filter in Swift
+        let descriptor = FetchDescriptor<LocalConversation>()
+        let allConversations = try modelContext.fetch(descriptor)
 
-        guard let conversation = try modelContext.fetch(descriptor).first else {
+        guard let conversation = allConversations.first(where: { $0.id == conversationId }) else {
             throw LocalStorageError.conversationNotFound
         }
 
@@ -215,11 +299,11 @@ class LocalStorageService: ObservableObject {
 
     /// Delete a conversation
     func deleteConversation(conversationId: String) throws {
-        let descriptor = FetchDescriptor<LocalConversation>(
-            predicate: #Predicate { $0.id == conversationId }
-        )
+        // Fetch all and filter in Swift
+        let descriptor = FetchDescriptor<LocalConversation>()
+        let allConversations = try modelContext.fetch(descriptor)
 
-        guard let conversation = try modelContext.fetch(descriptor).first else {
+        guard let conversation = allConversations.first(where: { $0.id == conversationId }) else {
             throw LocalStorageError.conversationNotFound
         }
 
@@ -231,12 +315,20 @@ class LocalStorageService: ObservableObject {
 
     /// Fetch all pending messages (failed or sending)
     func fetchPendingMessages() throws -> [LocalMessage] {
-        let descriptor = FetchDescriptor<LocalMessage>(
-            predicate: #Predicate { $0.isPending == true },
-            sortBy: [SortDescriptor(\.timestamp, order: .forward)]
-        )
+        do {
+            // Fetch all and filter in Swift
+            let descriptor = FetchDescriptor<LocalMessage>()
+            let allMessages = try modelContext.fetch(descriptor)
 
-        return try modelContext.fetch(descriptor)
+            // Filter and sort in Swift
+            return allMessages
+                .filter { $0.isPending == true }
+                .sorted { $0.timestamp < $1.timestamp }
+        } catch {
+            print("❌ Error fetching pending messages: \(error)")
+            try? clearAllData()
+            return []
+        }
     }
 
     // MARK: - Cleanup

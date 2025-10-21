@@ -1,16 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "messages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "timestamp",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "conversations",
       "queryScope": "COLLECTION",
       "fields": [
@@ -19,7 +9,7 @@
           "arrayConfig": "CONTAINS"
         },
         {
-          "fieldPath": "lastMessageTimestamp",
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ]

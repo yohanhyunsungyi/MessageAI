@@ -32,9 +32,13 @@ class MessageService: ObservableObject {
     }
 
     nonisolated deinit {
+        // Capture listeners to avoid capturing self in Task
+        let messageListener = listener
+        let typingListenerRef = typingListener
+        
         Task { @MainActor in
-            listener?.remove()
-            typingListener?.remove()
+            messageListener?.remove()
+            typingListenerRef?.remove()
         }
     }
 
@@ -111,7 +115,7 @@ class MessageService: ObservableObject {
             try await localStorageService.saveMessage(message, conversationId: conversationId)
         } catch {
             print("Failed to save message locally: \(error)")
-            throw MessageError.localStorageFailed
+            // Non-fatal - Firestore is source of truth
         }
     }
 
@@ -121,11 +125,17 @@ class MessageService: ObservableObject {
         localId: String
     ) async throws {
         do {
+            print("📤 Syncing message to Firestore...")
+            print("   - conversationId: \(conversationId)")
+            print("   - text: \(message.text)")
+            
             let docRef = try await firestore
                 .collection(Constants.Collections.conversations)
                 .document(conversationId)
                 .collection(Constants.Collections.messages)
                 .addDocument(data: message.toDictionary())
+
+            print("✅ Message saved to Firestore: \(docRef.documentID)")
 
             // Create updated message with server ID
             let updatedMessage = Message(
@@ -153,11 +163,14 @@ class MessageService: ObservableObject {
                 messages[index] = updatedMessage
             }
 
+            print("📊 Updating conversation last message...")
             try await updateConversationLastMessage(
                 conversationId: conversationId,
                 message: updatedMessage
             )
+            print("✅ Message send complete!")
         } catch {
+            print("❌ Firestore sync failed: \(error)")
             try await handleSendFailure(message, localId: localId, error: error)
         }
     }
@@ -184,13 +197,16 @@ class MessageService: ObservableObject {
 
     func fetchLocalMessages(conversationId: String) async {
         do {
-            let localMessages = try await localStorageService.fetchMessages(conversationId: conversationId)
+            let localMessages = try localStorageService.fetchMessages(conversationId: conversationId)
             messages = convertLocalMessages(localMessages)
-            print("Loaded \(messages.count) messages from local storage")
+            print("📱 Loaded \(messages.count) messages from local cache")
         } catch {
-            print("Failed to fetch local messages: \(error)")
-            errorMessage = "Failed to load messages"
+            print("❌ Failed to fetch local messages: \(error)")
+            messages = []
         }
+        
+        // Note: Local is just a cache for instant UI
+        // Real-time listener is the source of truth
     }
 
     private func convertLocalMessages(_ localMessages: [LocalMessage]) -> [Message] {
@@ -215,6 +231,10 @@ class MessageService: ObservableObject {
     func startListening(conversationId: String) {
         stopListening()
 
+        print("🔥 Starting messages listener for: \(conversationId)")
+        print("🔍 Path: conversations/\(conversationId)/messages")
+        print("🔍 Current user: \(currentUserId)")
+
         listener = firestore
             .collection(Constants.Collections.conversations)
             .document(conversationId)
@@ -224,19 +244,55 @@ class MessageService: ObservableObject {
                 guard let self = self else { return }
 
                 if let error = error {
-                    print("Error listening to messages: \(error)")
+                    print("❌ Messages listener error: \(error)")
                     Task { @MainActor in
                         self.errorMessage = "Failed to sync messages"
                     }
                     return
                 }
 
-                guard let documents = snapshot?.documents else { return }
+                guard let documents = snapshot?.documents else {
+                    print("⚠️ Snapshot documents are nil")
+                    return
+                }
+
+                print("📦 Listener snapshot: \(documents.count) raw documents")
+                for (idx, doc) in documents.enumerated() {
+                    print("   [\(idx)] ID: \(doc.documentID)")
+                }
 
                 Task { @MainActor in
                     let fetchedMessages = documents.compactMap { doc -> Message? in
-                        try? doc.data(as: Message.self)
+                        let data = doc.data()
+                        
+                        // Manually decode since Firestore doc.data(as:) doesn't include doc.id
+                        guard let senderId = data["senderId"] as? String,
+                              let senderName = data["senderName"] as? String,
+                              let text = data["text"] as? String,
+                              let timestamp = (data["timestamp"] as? Timestamp)?.dateValue(),
+                              let statusRaw = data["status"] as? String,
+                              let status = MessageStatus(rawValue: statusRaw) else {
+                            print("⚠️ Missing required fields in: \(doc.documentID)")
+                            return nil
+                        }
+                        
+                        let readBy = (data["readBy"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
+                        let deliveredTo = (data["deliveredTo"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
+                        
+                        return Message(
+                            id: doc.documentID,  // Use Firestore document ID
+                            senderId: senderId,
+                            senderName: senderName,
+                            senderPhotoURL: data["senderPhotoURL"] as? String,
+                            text: text,
+                            timestamp: timestamp,
+                            status: status,
+                            readBy: readBy,
+                            deliveredTo: deliveredTo,
+                            localId: data["localId"] as? String
+                        )
                     }
+                    print("✅ Listener decoded \(fetchedMessages.count) messages successfully")
                     await self.mergeMessages(fetchedMessages, conversationId: conversationId)
                     await self.autoMarkAsDelivered(conversationId: conversationId)
                 }
@@ -251,22 +307,23 @@ class MessageService: ObservableObject {
     // MARK: - Message Merging
 
     private func mergeMessages(_ remoteMessages: [Message], conversationId: String) async {
-        var mergedMessages: [Message] = []
-        let remoteIds = Set(remoteMessages.map { $0.id })
+        print("🔄 Merging: local=\(messages.count), remote=\(remoteMessages.count)")
+        
+        // Firestore is the source of truth - use remote data directly
+        messages = remoteMessages.sorted { $0.timestamp < $1.timestamp }
+        
+        print("✅ Merged result: \(messages.count) messages")
 
-        mergedMessages.append(contentsOf: remoteMessages)
-
-        for localMsg in messages where !remoteIds.contains(localMsg.id) {
-            if localMsg.status == .sending || localMsg.status == .failed {
-                mergedMessages.append(localMsg)
+        // Cache to local storage (async, non-blocking)
+        Task { @MainActor in
+            for message in remoteMessages {
+                do {
+                    try await localStorageService.saveMessage(message, conversationId: conversationId)
+                } catch {
+                    print("⚠️ Failed to cache message: \(error)")
+                }
             }
-        }
-
-        mergedMessages.sort { $0.timestamp < $1.timestamp }
-        messages = mergedMessages
-
-        for message in remoteMessages {
-            try? await localStorageService.saveMessage(message, conversationId: conversationId)
+            print("💾 Cached \(remoteMessages.count) messages locally")
         }
     }
 

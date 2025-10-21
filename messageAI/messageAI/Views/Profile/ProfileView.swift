@@ -268,4 +268,3 @@ struct SettingRow: View {
     ProfileView()
         .environmentObject(AuthService())
 }
-

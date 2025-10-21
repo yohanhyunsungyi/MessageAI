@@ -209,11 +209,11 @@ See [Tasks.md](Tasks.md) for deployment checklist.
 - [x] Users list screen (PR #8) ✅
 - [x] Main Tab View & Navigation (PR #9) ✅
 
-**Phase 3: Core Messaging** 🚧 60% COMPLETE (PR #10-12 of 14)
+**Phase 3: Core Messaging** 🚧 80% COMPLETE (PR #10-13 of 14)
 - [x] Conversation service (PR #10) ✅
 - [x] Conversations List UI (PR #11) ✅
 - [x] Message service (local-first) (PR #12) ✅
-- [ ] Chat UI (PR #13)
+- [x] Chat UI (PR #13) ✅
 - [ ] Read receipts (PR #14)
 
 **Phase 4: Advanced Features** (PR #15-18)
@@ -297,7 +297,7 @@ Yohan Yi - [@yohanhyunsungyi](https://github.com/yohanhyunsungyi)
 
 ---
 
-**Last Updated:** October 21, 2025  
-**Status:** PR #12 Complete, Ready for PR #13  
+**Last Updated:** October 21, 2025
+**Status:** PR #13 Complete, Ready for PR #14
 **Build Status:** ✅ Passing
 

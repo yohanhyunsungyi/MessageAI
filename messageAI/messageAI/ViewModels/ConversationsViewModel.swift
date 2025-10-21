@@ -50,8 +50,10 @@ class ConversationsViewModel: ObservableObject {
         conversationService.$conversations
             .receive(on: DispatchQueue.main)
             .sink { [weak self] conversations in
+                print("🔔 ConversationsViewModel received \(conversations.count) conversations")
                 self?.conversations = conversations
                 self?.filterConversations()
+                print("🔔 Filtered conversations: \(self?.filteredConversations.count ?? 0)")
             }
             .store(in: &cancellables)
 

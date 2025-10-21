@@ -75,30 +75,31 @@ class ConversationService: ObservableObject {
         let participantNames = try await fetchParticipantNames(participantIds: participantIds)
         let participantPhotos = try await fetchParticipantPhotos(participantIds: participantIds)
 
+        let now = Date()
         let conversation = Conversation(
             id: conversationId,
             participantIds: participantIds,
             participantNames: participantNames,
             participantPhotos: participantPhotos,
             lastMessage: nil,
-            lastMessageTimestamp: nil,
+            lastMessageTimestamp: now,  // Set to creation time so it appears in queries
             lastMessageSenderId: nil,
             type: .oneOnOne,
             groupName: nil,
-            createdAt: Date(),
+            createdAt: now,
             createdBy: currentUserId
         )
 
-        // Save to Firestore
+        // Save to Firestore (source of truth)
         try firestore
             .collection(Constants.Collections.conversations)
             .document(conversationId)
             .setData(from: conversation)
 
-        // Save to local storage
-        try localStorageService.saveConversation(conversation)
-
-        print("Created new one-on-one conversation: \(conversationId)")
+        print("✅ Created conversation: \(conversationId) (listener will cache it)")
+        
+        // Note: We DON'T save to local storage here
+        // The real-time listener will cache it automatically
 
         return conversationId
     }
@@ -135,30 +136,31 @@ class ConversationService: ObservableObject {
         let participantNames = try await fetchParticipantNames(participantIds: participantIds)
         let participantPhotos = try await fetchParticipantPhotos(participantIds: participantIds)
 
+        let now = Date()
         let conversation = Conversation(
             id: conversationId,
             participantIds: participantIds,
             participantNames: participantNames,
             participantPhotos: participantPhotos,
             lastMessage: nil,
-            lastMessageTimestamp: nil,
+            lastMessageTimestamp: now,  // Set to creation time so it appears in queries
             lastMessageSenderId: nil,
             type: .group,
             groupName: trimmedName,
-            createdAt: Date(),
+            createdAt: now,
             createdBy: currentUserId
         )
 
-        // Save to Firestore
+        // Save to Firestore (source of truth)
         try firestore
             .collection(Constants.Collections.conversations)
             .document(conversationId)
             .setData(from: conversation)
 
-        // Save to local storage
-        try localStorageService.saveConversation(conversation)
-
-        print("Created new group conversation: \(conversationId) with \(participantIds.count) participants")
+        print("✅ Created group conversation: \(conversationId) with \(participantIds.count) participants (listener will cache it)")
+        
+        // Note: We DON'T save to local storage here
+        // The real-time listener will cache it automatically
 
         return conversationId
     }
@@ -169,30 +171,35 @@ class ConversationService: ObservableObject {
     /// - Parameter id: Conversation ID
     /// - Returns: Conversation object
     func getConversation(id: String) async throws -> Conversation {
+        print("🔍 Getting conversation: \(id)")
+        
         // Try local storage first
-        if let _ = try? localStorageService.fetchConversation(id: id) {
-            // Found in local storage, fetch from Firestore to get full data
-            let conversation = try await firestore
-                .collection(Constants.Collections.conversations)
-                .document(id)
-                .getDocument(as: Conversation.self)
-
+        if let localConv = localStorageService.fetchConversation(id: id),
+           let conversation = localConv.toConversation() {
+            print("✅ Found conversation in local storage")
             return conversation
         }
 
         // Fetch from Firestore
+        print("📡 Fetching from Firestore...")
         let conversation = try await firestore
             .collection(Constants.Collections.conversations)
             .document(id)
             .getDocument(as: Conversation.self)
 
         // Save to local storage
-        try localStorageService.saveConversation(conversation)
+        do {
+            try localStorageService.saveConversation(conversation)
+            print("✅ Cached conversation locally")
+        } catch {
+            print("⚠️ Failed to cache (non-fatal): \(error)")
+        }
 
         return conversation
     }
 
-    /// Fetch all conversations for the current user
+    /// Load cached conversations from local storage for instant UI
+    /// Real data will come from the real-time listener
     func fetchConversations() async throws {
         guard let currentUserId = FirebaseManager.shared.currentUserId else {
             throw ConversationError.notAuthenticated
@@ -203,41 +210,19 @@ class ConversationService: ObservableObject {
 
         defer { isLoading = false }
 
-        do {
-            // Load from local storage first (instant UI)
-            let localConversations = try localStorageService.fetchConversations()
-
-            if !localConversations.isEmpty {
-                // Convert LocalConversations to Conversations and update UI immediately
-                let conversations = try await convertLocalConversations(localConversations)
-                self.conversations = conversations
-                print("Loaded \(conversations.count) conversations from local storage")
-            }
-
-            // Then fetch from Firestore to get updates
-            let snapshot = try await firestore
-                .collection(Constants.Collections.conversations)
-                .whereField("participantIds", arrayContains: currentUserId)
-                .order(by: "lastMessageTimestamp", descending: true)
-                .getDocuments()
-
-            let firestoreConversations = snapshot.documents.compactMap { doc -> Conversation? in
-                try? doc.data(as: Conversation.self)
-            }
-
-            // Update local storage
-            for conversation in firestoreConversations {
-                try localStorageService.saveConversation(conversation)
-            }
-
-            // Update published property
-            self.conversations = firestoreConversations
-
-            print("Fetched \(firestoreConversations.count) conversations from Firestore")
-        } catch {
-            errorMessage = "Failed to fetch conversations"
-            throw ConversationError.fetchFailed
+        // Load from local cache for instant UI
+        // The real-time listener will provide the source of truth
+        let localConversations = localStorageService.fetchConversations()
+        if !localConversations.isEmpty {
+            let conversations = convertLocalConversations(localConversations)
+            self.conversations = conversations
+            print("📱 Loaded \(conversations.count) conversations from local cache")
+        } else {
+            print("📱 No local cache, waiting for real-time listener...")
         }
+        
+        // Note: We DON'T fetch from Firestore here to avoid race condition
+        // The real-time listener (startListening) is the ONLY source of Firestore data
     }
 
     // MARK: - Update Conversations
@@ -261,11 +246,15 @@ class ConversationService: ObservableObject {
                 .updateData(updates)
 
             // Update local storage
-            try localStorageService.updateConversationLastMessage(
-                conversationId: conversationId,
-                lastMessage: message.text,
-                timestamp: message.timestamp
-            )
+            do {
+                try localStorageService.updateConversationLastMessage(
+                    conversationId: conversationId,
+                    lastMessage: message.text,
+                    timestamp: message.timestamp
+                )
+            } catch {
+                print("⚠️ Failed to update local storage (non-fatal): \(error)")
+            }
 
             print("Updated last message for conversation: \(conversationId)")
         } catch {
@@ -277,46 +266,67 @@ class ConversationService: ObservableObject {
     // MARK: - Real-Time Listener
 
     /// Start listening to conversation changes in real-time
+    /// This is the ONLY source of Firestore data (no race condition with fetch)
     /// - Parameter userId: Current user ID
     func startListening(userId: String) {
         // Remove existing listener
         conversationsListener?.remove()
 
-        // Create new listener
+        print("🔥 Starting real-time listener for user: \(userId)")
+        print("🔍 Query: participantIds arrayContains \(userId), order by createdAt desc")
+
+        // Create new listener - this is the ONLY Firestore data source
         conversationsListener = firestore
             .collection(Constants.Collections.conversations)
             .whereField("participantIds", arrayContains: userId)
-            .order(by: "lastMessageTimestamp", descending: true)
+            .order(by: "createdAt", descending: true)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
                 if let error = error {
-                    print("Error listening to conversations: \(error.localizedDescription)")
+                    print("❌ Listener error: \(error.localizedDescription)")
+                    print("❌ Full error: \(error)")
                     Task { @MainActor in
                         self.errorMessage = "Failed to sync conversations"
                     }
                     return
                 }
 
-                guard let documents = snapshot?.documents else { return }
+                guard let documents = snapshot?.documents else {
+                    print("⚠️ Snapshot documents are nil")
+                    return
+                }
+
+                print("📦 Listener received \(documents.count) documents from Firestore")
 
                 let conversations = documents.compactMap { doc -> Conversation? in
-                    try? doc.data(as: Conversation.self)
+                    let conv = try? doc.data(as: Conversation.self)
+                    if conv == nil {
+                        print("⚠️ Failed to decode conversation: \(doc.documentID)")
+                    }
+                    return conv
                 }
+
+                print("✅ Successfully decoded \(conversations.count) conversations")
 
                 Task { @MainActor in
+                    // Update UI - Firestore is the source of truth
                     self.conversations = conversations
+                    print("✅ Real-time update: \(conversations.count) conversations")
 
-                    // Update local storage
-                    for conversation in conversations {
-                        try? self.localStorageService.saveConversation(conversation)
+                    // Cache to local storage (non-blocking background task)
+                    Task { @MainActor in
+                        for conversation in conversations {
+                            do {
+                                try self.localStorageService.saveConversation(conversation)
+                            } catch {
+                                print("⚠️ Cache failed for \(conversation.id): \(error)")
+                            }
+                        }
+                        print("💾 Cached \(conversations.count) conversations locally")
                     }
-
-                    print("Real-time update: \(conversations.count) conversations")
                 }
             }
-
-        print("Started listening to conversations for user: \(userId)")
     }
 
     /// Stop listening to conversation changes
@@ -390,20 +400,32 @@ class ConversationService: ObservableObject {
         return photos
     }
 
-    /// Convert LocalConversations to Conversations by fetching from Firestore
-    private func convertLocalConversations(_ localConversations: [LocalConversation]) async throws -> [Conversation] {
-        var conversations: [Conversation] = []
-
-        for local in localConversations {
-            do {
-                let conversation = try await getConversation(id: local.id)
-                conversations.append(conversation)
-            } catch {
-                print("Failed to convert local conversation \(local.id): \(error.localizedDescription)")
+    /// Convert LocalConversations to Conversations (no network call needed!)
+    private func convertLocalConversations(_ localConversations: [LocalConversation]) -> [Conversation] {
+        print("🔄 Converting \(localConversations.count) local conversations...")
+        
+        let conversations = localConversations.compactMap { local -> Conversation? in
+            if let conversation = local.toConversation() {
+                return conversation
+            } else {
+                print("⚠️ Failed to convert local conversation \(local.id)")
+                // Clean up bad data
+                try? localStorageService.deleteConversation(conversationId: local.id)
+                return nil
             }
         }
-
+        
+        print("✅ Successfully converted \(conversations.count) conversations")
         return conversations
+    }
+    
+    /// Clear all local conversations (useful for debugging or reset)
+    func clearLocalConversations() {
+        let localConvs = localStorageService.fetchConversations()
+        for conv in localConvs {
+            try? localStorageService.deleteConversation(conversationId: conv.id)
+        }
+        print("Cleared \(localConvs.count) local conversations")
     }
 }
 

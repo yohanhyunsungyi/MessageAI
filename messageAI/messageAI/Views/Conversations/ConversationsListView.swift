@@ -7,22 +7,26 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 /// List view displaying all conversations
 struct ConversationsListView: View {
-    
+
     // MARK: - Environment
-    
+
     @EnvironmentObject var authService: AuthService
     @Environment(\.modelContext) private var modelContext
-    
+
     // MARK: - State
-    
+
+    @State private var hasSetup = false
     @State private var conversationService: ConversationService?
-    @State private var viewModel: ConversationsViewModel?
-    @State private var selectedConversation: Conversation?
-    @State private var showingChatView = false
+    @StateObject private var vmWrapper = ConversationsViewModelWrapper()
     @State private var showError = false
+    
+    private var conversationsViewModel: ConversationsViewModel? {
+        vmWrapper.vm
+    }
 
     // MARK: - Body
 
@@ -32,20 +36,19 @@ struct ConversationsListView: View {
                 // Background
                 UIStyleGuide.Colors.background
                     .ignoresSafeArea()
-                
-                if let viewModel = viewModel {
-                    if viewModel.isLoading && viewModel.conversations.isEmpty {
-                        // Loading state
+
+                if let vm = conversationsViewModel {
+                    let _ = print("🎨 Rendering: \(vm.filteredConversations.count) filtered conversations")
+                    
+                    if vm.isLoading && vm.conversations.isEmpty {
                         loadingView
-                    } else if viewModel.filteredConversations.isEmpty {
-                        // Empty state
-                        emptyStateView(viewModel: viewModel)
+                    } else if vm.filteredConversations.isEmpty {
+                        emptyStateView(viewModel: vm)
                     } else {
-                        // Conversations list
-                        conversationsListView(viewModel: viewModel)
+                        conversationsListView(viewModel: vm)
                     }
                 } else {
-                    // Initializing
+                    let _ = print("🎨 ConversationsListView: ViewModel is nil")
                     loadingView
                 }
             }
@@ -53,42 +56,44 @@ struct ConversationsListView: View {
             .navigationBarTitleDisplayMode(.large)
             .searchable(
                 text: Binding(
-                    get: { viewModel?.searchText ?? "" },
-                    set: { viewModel?.searchText = $0 }
+                    get: { conversationsViewModel?.searchText ?? "" },
+                    set: { conversationsViewModel?.searchText = $0 }
                 ),
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search conversations"
             )
             .refreshable {
-                if let viewModel = viewModel {
-                    await viewModel.refresh()
-                }
+                await conversationsViewModel?.refresh()
+            }
+            .navigationDestination(for: String.self) { conversationId in
+                ChatView(
+                    conversationId: conversationId,
+                    localStorageService: LocalStorageService(modelContext: modelContext)
+                )
             }
             .alert("Error", isPresented: $showError) {
                 Button("OK") {
-                    viewModel?.clearError()
+                    conversationsViewModel?.clearError()
                 }
             } message: {
-                if let error = viewModel?.errorMessage {
+                if let error = conversationsViewModel?.errorMessage {
                     Text(error)
                 }
             }
-            .sheet(isPresented: $showingChatView) {
-                if let conversation = selectedConversation {
-                    // ChatView placeholder
-                    chatViewPlaceholder(conversation: conversation)
-                }
-            }
-            .onAppear {
-                if viewModel == nil {
+            .task {
+                if !hasSetup {
                     setupViewModel()
+                    hasSetup = true
                 }
             }
             .onDisappear {
-                viewModel?.stopListening()
+                conversationsViewModel?.stopListening()
             }
-            .onChange(of: viewModel?.errorMessage) { _, newValue in
+            .onChange(of: conversationsViewModel?.errorMessage) { _, newValue in
                 showError = newValue != nil
+            }
+            .onChange(of: conversationsViewModel?.conversations.count ?? 0) { oldValue, newValue in
+                print("🔄 Conversations count changed: \(oldValue) → \(newValue)")
             }
         }
     }
@@ -107,27 +112,27 @@ struct ConversationsListView: View {
     }
 
     // MARK: - Empty State View
-    
+
     private func emptyStateView(viewModel: ConversationsViewModel) -> some View {
         VStack(spacing: UIStyleGuide.Spacing.lg) {
             Spacer()
-            
+
             // Icon
             ZStack {
                 Circle()
                     .fill(UIStyleGuide.Colors.cardBackground)
                     .frame(width: 120, height: 120)
-                
+
                 Image(systemName: "message.fill")
                     .font(.system(size: 50))
                     .foregroundColor(UIStyleGuide.Colors.textTertiary)
             }
-            
+
             // Title
             Text(viewModel.searchText.isEmpty ? "No Conversations Yet" : "No Results Found")
                 .font(UIStyleGuide.Typography.title2)
                 .foregroundColor(UIStyleGuide.Colors.textPrimary)
-            
+
             // Subtitle
             Text(viewModel.searchText.isEmpty
                  ? "Start a conversation by selecting\na user from the Users tab"
@@ -136,86 +141,37 @@ struct ConversationsListView: View {
                 .foregroundColor(UIStyleGuide.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
-            
+
             Spacer()
         }
         .padding(UIStyleGuide.Spacing.md)
     }
 
     // MARK: - Conversations List View
-    
+
     private func conversationsListView(viewModel: ConversationsViewModel) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(viewModel.filteredConversations) { conversation in
-                    Button {
-                        selectedConversation = conversation
-                        showingChatView = true
-                    } label: {
-                        ConversationRowView(
-                            conversation: conversation,
-                            displayName: viewModel.getConversationName(conversation),
-                            subtitle: viewModel.getConversationSubtitle(conversation),
-                            photoURL: viewModel.getConversationPhotoURL(conversation)
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Divider
-                    if conversation.id != viewModel.filteredConversations.last?.id {
-                        Divider()
-                            .padding(.leading, 88) // Align with text
-                    }
-                }
+        let _ = print("📋 Rendering list with \(viewModel.filteredConversations.count) items")
+        
+        return List(viewModel.filteredConversations, id: \.id) { conversation in
+            NavigationLink(value: conversation.id) {
+                ConversationRowView(
+                    conversation: conversation,
+                    displayName: viewModel.getConversationName(conversation),
+                    subtitle: viewModel.getConversationSubtitle(conversation),
+                    photoURL: viewModel.getConversationPhotoURL(conversation)
+                )
             }
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
         }
+        .listStyle(.plain)
+        .background(UIStyleGuide.Colors.background)
     }
 
-    // MARK: - Chat View Placeholder
-    
-    private func chatViewPlaceholder(conversation: Conversation) -> some View {
-        let conversationName = viewModel?.getConversationName(conversation) ?? "Chat"
-        
-        return NavigationStack {
-            VStack(spacing: UIStyleGuide.Spacing.lg) {
-                Spacer()
-                
-                Image(systemName: "ellipsis.message.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(UIStyleGuide.Colors.primary)
-                
-                Text("Chat View")
-                    .font(UIStyleGuide.Typography.title)
-                    .foregroundColor(UIStyleGuide.Colors.textPrimary)
-                
-                Text("Coming in PR #13")
-                    .font(UIStyleGuide.Typography.body)
-                    .foregroundColor(UIStyleGuide.Colors.textSecondary)
-                
-                Text(conversationName)
-                    .font(UIStyleGuide.Typography.bodyBold)
-                    .foregroundColor(UIStyleGuide.Colors.textPrimary)
-                    .padding(.top, UIStyleGuide.Spacing.md)
-                
-                Spacer()
-            }
-            .navigationTitle(conversationName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingChatView = false
-                    } label: {
-                        Image(systemName: "xmark")
-                            .foregroundColor(UIStyleGuide.Colors.textPrimary)
-                    }
-                }
-            }
-        }
-    }
 
     // MARK: - Helper Methods
-    
+
     private func setupViewModel() {
         // Initialize services with proper ModelContext
         let localStorageService = LocalStorageService(modelContext: modelContext)
@@ -224,17 +180,33 @@ struct ConversationsListView: View {
             conversationService: service,
             authService: authService
         )
-        
+
         // Update state
         conversationService = service
-        viewModel = vm
-        
+        vmWrapper.vm = vm
+
         // Load data
         Task {
             await vm.loadConversations()
             vm.startListening()
         }
     }
+}
+
+// MARK: - Wrapper
+
+@MainActor
+class ConversationsViewModelWrapper: ObservableObject {
+    @Published var vm: ConversationsViewModel? {
+        didSet {
+            // Forward ViewModel's objectWillChange to this wrapper
+            cancellable = vm?.objectWillChange.sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+        }
+    }
+    
+    private var cancellable: AnyCancellable?
 }
 
 // MARK: - Preview
@@ -244,5 +216,3 @@ struct ConversationsListView: View {
         .environmentObject(AuthService())
         .modelContainer(for: [LocalMessage.self, LocalConversation.self])
 }
-
-

@@ -10,21 +10,21 @@ import XCTest
 
 @MainActor
 final class AuthServiceTests: XCTestCase {
-    
+
     var authService: AuthService!
-    
+
     override func setUp() async throws {
         try await super.setUp()
         authService = AuthService()
     }
-    
+
     override func tearDown() async throws {
         authService = nil
         try await super.tearDown()
     }
-    
+
     // MARK: - Initialization Tests
-    
+
     func testAuthServiceInitialization() {
         XCTAssertNotNil(authService)
         XCTAssertFalse(authService.isAuthenticated)
@@ -33,9 +33,9 @@ final class AuthServiceTests: XCTestCase {
         XCTAssertNil(authService.errorMessage)
         XCTAssertFalse(authService.isLoading)
     }
-    
+
     // MARK: - Email Validation Tests
-    
+
     func testEmailValidation() async throws {
         // Test valid email
         do {
@@ -45,7 +45,7 @@ final class AuthServiceTests: XCTestCase {
         } catch {
             // Other errors are expected in test environment
         }
-        
+
         // Test invalid email
         do {
             _ = try await authService.signUp(email: "invalid-email", password: "password123")
@@ -55,7 +55,7 @@ final class AuthServiceTests: XCTestCase {
         } catch {
             XCTFail("Should throw invalidEmail error, got: \(error)")
         }
-        
+
         // Test empty email
         do {
             _ = try await authService.signUp(email: "", password: "password123")
@@ -66,9 +66,9 @@ final class AuthServiceTests: XCTestCase {
             XCTFail("Should throw invalidEmail error, got: \(error)")
         }
     }
-    
+
     // MARK: - Password Validation Tests
-    
+
     func testPasswordValidation() async throws {
         // Test weak password (less than 6 characters)
         do {
@@ -79,7 +79,7 @@ final class AuthServiceTests: XCTestCase {
         } catch {
             // Other errors acceptable in test environment
         }
-        
+
         // Test valid password
         do {
             _ = try await authService.signUp(email: "test@example.com", password: "123456")
@@ -89,9 +89,9 @@ final class AuthServiceTests: XCTestCase {
             // Other errors are expected in test environment
         }
     }
-    
+
     // MARK: - Empty Password Tests
-    
+
     func testSignInWithEmptyPassword() async throws {
         do {
             _ = try await authService.signIn(email: "test@example.com", password: "")
@@ -102,17 +102,17 @@ final class AuthServiceTests: XCTestCase {
             XCTFail("Should throw emptyPassword error, got: \(error)")
         }
     }
-    
+
     // MARK: - Auth State Tests
-    
+
     func testAuthStateAfterSignUp() async throws {
         // Initially not authenticated
         XCTAssertFalse(authService.isAuthenticated)
-        
+
         // Note: Actual sign up would require Firebase connection
         // In unit tests, we test the state changes
     }
-    
+
     func testAuthStateAfterSignOut() throws {
         // Sign out should clear user state
         do {
@@ -124,18 +124,18 @@ final class AuthServiceTests: XCTestCase {
             // Sign out may fail if not signed in, which is fine
         }
     }
-    
+
     // MARK: - Loading State Tests
-    
+
     func testLoadingStateToggle() async throws {
         XCTAssertFalse(authService.isLoading)
-        
+
         // Loading state should be managed during operations
         // Note: In real tests, we'd mock Firebase to test loading states
     }
-    
+
     // MARK: - Onboarding Validation Tests
-    
+
     func testOnboardingValidation() async throws {
         // Test empty display name
         do {
@@ -148,7 +148,7 @@ final class AuthServiceTests: XCTestCase {
         } catch {
             XCTFail("Should throw invalidDisplayName or notAuthenticated, got: \(error)")
         }
-        
+
         // Test whitespace-only display name
         do {
             _ = try await authService.completeOnboarding(displayName: "   ", photoURL: nil)
@@ -161,9 +161,9 @@ final class AuthServiceTests: XCTestCase {
             XCTFail("Should throw invalidDisplayName or notAuthenticated, got: \(error)")
         }
     }
-    
+
     // MARK: - Error Message Tests
-    
+
     func testAuthErrorMessages() {
         let errors: [AuthError] = [
             .invalidEmail,
@@ -176,15 +176,15 @@ final class AuthServiceTests: XCTestCase {
             .googleSignInCancelled,
             .signOutFailed
         ]
-        
+
         for error in errors {
             XCTAssertNotNil(error.errorDescription, "Error \(error) should have description")
             XCTAssertFalse(error.errorDescription!.isEmpty, "Error description should not be empty")
         }
     }
-    
+
     // MARK: - Google Sign-In Error Tests
-    
+
     func testGoogleSignInConfiguration() async throws {
         // Test that Google Sign-In can be initiated
         // Actual sign-in requires UI interaction
@@ -198,9 +198,9 @@ final class AuthServiceTests: XCTestCase {
             // Other errors acceptable in test environment
         }
     }
-    
+
     // MARK: - Profile Update Tests
-    
+
     func testProfileUpdateRequiresAuthentication() async throws {
         // Profile update should fail if not authenticated
         do {
@@ -212,22 +212,22 @@ final class AuthServiceTests: XCTestCase {
             // Other errors acceptable
         }
     }
-    
+
     // MARK: - Session Persistence Tests
-    
+
     func testAuthStateListenerSetup() {
         // Auth state listener should be set up on initialization
         XCTAssertNotNil(authService)
         // Listener is private, but we can verify state is being tracked
         XCTAssertFalse(authService.isAuthenticated)
     }
-    
+
     // MARK: - Performance Tests
-    
+
     func testSignUpPerformance() {
         measure {
             let expectation = self.expectation(description: "Sign up validation")
-            
+
             Task { @MainActor in
                 do {
                     _ = try await self.authService.signUp(
@@ -239,15 +239,15 @@ final class AuthServiceTests: XCTestCase {
                 }
                 expectation.fulfill()
             }
-            
+
             wait(for: [expectation], timeout: 1.0)
         }
     }
-    
+
     func testSignInPerformance() {
         measure {
             let expectation = self.expectation(description: "Sign in validation")
-            
+
             Task { @MainActor in
                 do {
                     _ = try await self.authService.signIn(
@@ -259,9 +259,8 @@ final class AuthServiceTests: XCTestCase {
                 }
                 expectation.fulfill()
             }
-            
+
             wait(for: [expectation], timeout: 1.0)
         }
     }
 }
-
