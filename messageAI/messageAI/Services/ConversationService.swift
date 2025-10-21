@@ -25,16 +25,25 @@ class ConversationService: ObservableObject {
     private let firestore: Firestore
     private let localStorageService: LocalStorageService
     private var conversationsListener: ListenerRegistration?
+    private var notificationService: NotificationService?
+    private var previousConversations: [String: Conversation] = [:]  // Track previous state for change detection
+    private var currentUserId: String?
 
     // MARK: - Initialization
 
-    init(localStorageService: LocalStorageService) {
+    init(localStorageService: LocalStorageService, notificationService: NotificationService? = nil) {
         self.firestore = FirebaseManager.shared.firestore
         self.localStorageService = localStorageService
+        self.notificationService = notificationService
     }
 
     deinit {
         conversationsListener?.remove()
+    }
+
+    /// Set the notification service (for late injection)
+    func setNotificationService(_ service: NotificationService) {
+        self.notificationService = service
     }
 
     // MARK: - Create Conversations
@@ -90,11 +99,25 @@ class ConversationService: ObservableObject {
             createdBy: currentUserId
         )
 
-        // Save to Firestore (source of truth)
-        try firestore
+        // Save to Firestore (source of truth) with explicit Timestamp conversion
+        let conversationData: [String: Any] = [
+            "id": conversationId,
+            "participantIds": participantIds,
+            "participantNames": participantNames,
+            "participantPhotos": participantPhotos.mapValues { $0 ?? "" },
+            "lastMessage": NSNull(),
+            "lastMessageTimestamp": Timestamp(date: now),  // Explicit Timestamp
+            "lastMessageSenderId": NSNull(),
+            "type": conversation.type.rawValue,
+            "groupName": NSNull(),
+            "createdAt": Timestamp(date: now),  // Explicit Timestamp
+            "createdBy": currentUserId
+        ]
+        
+        try await firestore
             .collection(Constants.Collections.conversations)
             .document(conversationId)
-            .setData(from: conversation)
+            .setData(conversationData)
 
         print("✅ Created conversation: \(conversationId) (listener will cache it)")
         
@@ -151,11 +174,25 @@ class ConversationService: ObservableObject {
             createdBy: currentUserId
         )
 
-        // Save to Firestore (source of truth)
-        try firestore
+        // Save to Firestore (source of truth) with explicit Timestamp conversion
+        let conversationData: [String: Any] = [
+            "id": conversationId,
+            "participantIds": participantIds,
+            "participantNames": participantNames,
+            "participantPhotos": participantPhotos.mapValues { $0 ?? "" },
+            "lastMessage": NSNull(),
+            "lastMessageTimestamp": Timestamp(date: now),  // Explicit Timestamp
+            "lastMessageSenderId": NSNull(),
+            "type": conversation.type.rawValue,
+            "groupName": trimmedName,
+            "createdAt": Timestamp(date: now),  // Explicit Timestamp
+            "createdBy": currentUserId
+        ]
+        
+        try await firestore
             .collection(Constants.Collections.conversations)
             .document(conversationId)
-            .setData(from: conversation)
+            .setData(conversationData)
 
         print("✅ Created group conversation: \(conversationId) with \(participantIds.count) participants (listener will cache it)")
         
@@ -271,15 +308,18 @@ class ConversationService: ObservableObject {
     func startListening(userId: String) {
         // Remove existing listener
         conversationsListener?.remove()
+        
+        // Store current user ID for change detection
+        self.currentUserId = userId
 
         print("🔥 Starting real-time listener for user: \(userId)")
-        print("🔍 Query: participantIds arrayContains \(userId), order by createdAt desc")
+        print("🔍 Query: participantIds arrayContains \(userId), order by lastMessageTimestamp desc")
 
-        // Create new listener - this is the ONLY Firestore data source
+        // Create new listener - ordered by lastMessageTimestamp for proper sorting
         conversationsListener = firestore
             .collection(Constants.Collections.conversations)
             .whereField("participantIds", arrayContains: userId)
-            .order(by: "createdAt", descending: true)
+            .order(by: "lastMessageTimestamp", descending: true)  // Changed from createdAt
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
@@ -310,6 +350,9 @@ class ConversationService: ObservableObject {
                 print("✅ Successfully decoded \(conversations.count) conversations")
 
                 Task { @MainActor in
+                    // Detect new messages for notifications
+                    await self.detectNewMessagesAndNotify(conversations, userId: userId)
+                    
                     // Update UI - Firestore is the source of truth
                     self.conversations = conversations
                     print("✅ Real-time update: \(conversations.count) conversations")
@@ -333,7 +376,87 @@ class ConversationService: ObservableObject {
     func stopListening() {
         conversationsListener?.remove()
         conversationsListener = nil
+        previousConversations.removeAll()
+        currentUserId = nil
         print("Stopped listening to conversations")
+    }
+
+    // MARK: - Notification Detection
+
+    /// Detect new messages and show notifications
+    private func detectNewMessagesAndNotify(_ conversations: [Conversation], userId: String) async {
+        print("🔍 detectNewMessagesAndNotify called for \(conversations.count) conversations")
+        print("   NotificationService is: \(notificationService == nil ? "nil" : "set")")
+        print("   Previous conversations count: \(previousConversations.count)")
+        
+        guard let notificationService = notificationService else {
+            print("⚠️ NotificationService not set - caching state only")
+            // First load - just cache the state
+            for conversation in conversations {
+                previousConversations[conversation.id] = conversation
+            }
+            return
+        }
+
+        // Check each conversation for new messages
+        for conversation in conversations {
+            print("📋 Checking conversation: \(conversation.id)")
+            print("   lastMessage: \(conversation.lastMessage ?? "nil")")
+            print("   lastMessageSenderId: \(conversation.lastMessageSenderId ?? "nil")")
+            print("   lastMessageTimestamp: \(conversation.lastMessageTimestamp?.description ?? "nil")")
+            
+            guard let lastMessage = conversation.lastMessage,
+                  let lastMessageSenderId = conversation.lastMessageSenderId,
+                  lastMessageSenderId != userId else {
+                // Skip if no message or message is from current user
+                print("   ⏭️ Skipped (no message or from self)")
+                continue
+            }
+
+            let previousConversation = previousConversations[conversation.id]
+            print("   Previous conversation exists: \(previousConversation != nil)")
+            
+            // Check if this is a new message (timestamp changed or first time seeing this conversation)
+            let isNewMessage: Bool
+            if let prev = previousConversation,
+               let currentTimestamp = conversation.lastMessageTimestamp,
+               let prevTimestamp = prev.lastMessageTimestamp {
+                isNewMessage = currentTimestamp > prevTimestamp
+                print("   Comparing timestamps: current=\(currentTimestamp), prev=\(prevTimestamp)")
+                print("   Is new message: \(isNewMessage)")
+            } else if let timestamp = conversation.lastMessageTimestamp, previousConversation == nil {
+                // First time seeing this conversation - check if message is recent (within last 10 seconds)
+                let timeSinceMessage = Date().timeIntervalSince(timestamp)
+                isNewMessage = timeSinceMessage < 10
+                print("   First time seeing conversation, time since message: \(timeSinceMessage)s")
+                print("   Is new message: \(isNewMessage)")
+            } else {
+                isNewMessage = false
+                print("   Is new message: false (no valid timestamps)")
+            }
+
+            if isNewMessage {
+                print("🔔 New message detected in conversation: \(conversation.id)")
+                print("   From: \(lastMessageSenderId)")
+                print("   Message: \(lastMessage)")
+
+                // Get sender name
+                let senderName = conversation.participantNames[lastMessageSenderId] ?? "Someone"
+
+                // Show notification
+                await notificationService.showForegroundNotification(
+                    from: senderName,
+                    message: lastMessage,
+                    conversationId: conversation.id
+                )
+                print("✅ Notification shown")
+            }
+
+            // Update previous state
+            previousConversations[conversation.id] = conversation
+        }
+        
+        print("✅ detectNewMessagesAndNotify complete")
     }
 
     // MARK: - Helper Methods

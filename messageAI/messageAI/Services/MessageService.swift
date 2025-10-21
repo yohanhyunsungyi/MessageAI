@@ -24,18 +24,26 @@ class MessageService: ObservableObject {
     private var typingListener: ListenerRegistration?
     private var offlineQueue: [Message] = []
     private var isOnline = true
+    private var currentConversationId: String?
+    private var notificationService: NotificationService?
 
     // MARK: - Initialization
-    init(localStorageService: LocalStorageService) {
+    init(localStorageService: LocalStorageService, notificationService: NotificationService? = nil) {
         self.localStorageService = localStorageService
+        self.notificationService = notificationService
         observeNetworkStatus()
+    }
+
+    /// Set the notification service (for late injection)
+    func setNotificationService(_ service: NotificationService) {
+        self.notificationService = service
     }
 
     nonisolated deinit {
         // Capture listeners to avoid capturing self in Task
         let messageListener = listener
         let typingListenerRef = typingListener
-        
+
         Task { @MainActor in
             messageListener?.remove()
             typingListenerRef?.remove()
@@ -128,7 +136,7 @@ class MessageService: ObservableObject {
             print("📤 Syncing message to Firestore...")
             print("   - conversationId: \(conversationId)")
             print("   - text: \(message.text)")
-            
+
             let docRef = try await firestore
                 .collection(Constants.Collections.conversations)
                 .document(conversationId)
@@ -204,7 +212,7 @@ class MessageService: ObservableObject {
             print("❌ Failed to fetch local messages: \(error)")
             messages = []
         }
-        
+
         // Note: Local is just a cache for instant UI
         // Real-time listener is the source of truth
     }
@@ -230,6 +238,9 @@ class MessageService: ObservableObject {
 
     func startListening(conversationId: String) {
         stopListening()
+
+        // Track the current conversation
+        self.currentConversationId = conversationId
 
         print("🔥 Starting messages listener for: \(conversationId)")
         print("🔍 Path: conversations/\(conversationId)/messages")
@@ -264,7 +275,7 @@ class MessageService: ObservableObject {
                 Task { @MainActor in
                     let fetchedMessages = documents.compactMap { doc -> Message? in
                         let data = doc.data()
-                        
+
                         // Manually decode since Firestore doc.data(as:) doesn't include doc.id
                         guard let senderId = data["senderId"] as? String,
                               let senderName = data["senderName"] as? String,
@@ -275,10 +286,10 @@ class MessageService: ObservableObject {
                             print("⚠️ Missing required fields in: \(doc.documentID)")
                             return nil
                         }
-                        
+
                         let readBy = (data["readBy"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
                         let deliveredTo = (data["deliveredTo"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
-                        
+
                         return Message(
                             id: doc.documentID,  // Use Firestore document ID
                             senderId: senderId,
@@ -302,17 +313,30 @@ class MessageService: ObservableObject {
     func stopListening() {
         listener?.remove()
         listener = nil
+        currentConversationId = nil
     }
 
     // MARK: - Message Merging
 
     private func mergeMessages(_ remoteMessages: [Message], conversationId: String) async {
         print("🔄 Merging: local=\(messages.count), remote=\(remoteMessages.count)")
-        
+
+        // Detect new messages for notifications (only from others)
+        let existingMessageIds = Set(messages.map { $0.id })
+        let newMessages = remoteMessages.filter { message in
+            !existingMessageIds.contains(message.id) &&
+            message.senderId != currentUserId
+        }
+
         // Firestore is the source of truth - use remote data directly
         messages = remoteMessages.sorted { $0.timestamp < $1.timestamp }
-        
+
         print("✅ Merged result: \(messages.count) messages")
+
+        // Show notifications for new messages (only when not in this conversation)
+        if !newMessages.isEmpty {
+            await showNotificationsForNewMessages(newMessages, conversationId: conversationId)
+        }
 
         // Cache to local storage (async, non-blocking)
         Task { @MainActor in
@@ -324,6 +348,33 @@ class MessageService: ObservableObject {
                 }
             }
             print("💾 Cached \(remoteMessages.count) messages locally")
+        }
+    }
+
+    /// Show foreground notifications for new messages
+    private func showNotificationsForNewMessages(_ newMessages: [Message], conversationId: String) async {
+        guard let notificationService = notificationService else {
+            print("⚠️ NotificationService not available")
+            return
+        }
+
+        // Only show notification if NOT currently viewing this conversation
+        // Check if this is the active conversation being viewed
+        let isCurrentConversation = currentConversationId == conversationId
+
+        if isCurrentConversation {
+            print("📱 User is viewing conversation \(conversationId) - skipping notification")
+            return
+        }
+
+        // Show notifications for messages from other conversations
+        for message in newMessages {
+            print("🔔 Showing notification for message from \(message.senderName)")
+            await notificationService.showForegroundNotification(
+                from: message.senderName,
+                message: message.text,
+                conversationId: conversationId
+            )
         }
     }
 
@@ -468,9 +519,13 @@ class MessageService: ObservableObject {
             .document(conversationId)
             .updateData([
                 "lastMessage": message.text,
-                "lastMessageTimestamp": message.timestamp,
+                "lastMessageTimestamp": Timestamp(date: message.timestamp),
                 "lastMessageSenderId": message.senderId
             ])
+        
+        print("✅ Updated conversation lastMessage: \(message.text)")
+        print("   Timestamp: \(message.timestamp)")
+        print("   SenderId: \(message.senderId)")
     }
 }
 

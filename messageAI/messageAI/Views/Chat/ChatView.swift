@@ -9,10 +9,11 @@ import SwiftUI
 
 struct ChatView: View {
     @StateObject private var viewModel: ChatViewModel
+    @EnvironmentObject private var notificationService: NotificationService
     @State private var scrollProxy: ScrollViewProxy?
 
-    init(conversationId: String, localStorageService: LocalStorageService? = nil) {
-        _viewModel = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, localStorageService: localStorageService))
+    init(conversationId: String, localStorageService: LocalStorageService? = nil, notificationService: NotificationService? = nil) {
+        _viewModel = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, localStorageService: localStorageService, notificationService: notificationService))
     }
 
     var body: some View {

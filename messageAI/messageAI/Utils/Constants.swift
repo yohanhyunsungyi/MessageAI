@@ -45,6 +45,7 @@ enum Constants {
         static let userDidSignOut = "userDidSignOut"
         static let newMessageReceived = "newMessageReceived"
         static let conversationUpdated = "conversationUpdated"
+        static let openConversation = "openConversation"
     }
 
     // MARK: - Timeouts

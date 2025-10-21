@@ -15,6 +15,7 @@ struct ConversationsListView: View {
     // MARK: - Environment
 
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var notificationService: NotificationService
     @Environment(\.modelContext) private var modelContext
 
     // MARK: - State
@@ -206,10 +207,14 @@ struct ConversationsListView: View {
     private func setupViewModel() {
         // Initialize services with proper ModelContext
         let localStorageService = LocalStorageService(modelContext: modelContext)
-        let service = ConversationService(localStorageService: localStorageService)
+        let service = ConversationService(
+            localStorageService: localStorageService,
+            notificationService: notificationService
+        )
         let viewModel = ConversationsViewModel(
             conversationService: service,
-            authService: authService
+            authService: authService,
+            notificationService: notificationService
         )
 
         // Initialize UsersViewModel for group creation

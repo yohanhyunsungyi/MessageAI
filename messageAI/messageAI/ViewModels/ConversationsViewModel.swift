@@ -35,10 +35,16 @@ class ConversationsViewModel: ObservableObject {
 
     init(
         conversationService: ConversationService,
-        authService: AuthService
+        authService: AuthService,
+        notificationService: NotificationService? = nil
     ) {
         self.conversationService = conversationService
         self.authService = authService
+
+        // Set notification service if provided
+        if let notifService = notificationService {
+            conversationService.setNotificationService(notifService)
+        }
 
         setupBindings()
     }

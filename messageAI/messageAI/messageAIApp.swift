@@ -13,6 +13,7 @@ import FirebaseCore
 struct messageAIApp: App {
     @StateObject private var authService = AuthService()
     @StateObject private var presenceService = PresenceService()
+    @StateObject private var notificationService = NotificationService()
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -41,9 +42,11 @@ struct messageAIApp: App {
                     if authService.needsOnboarding {
                         OnboardingView()
                             .environmentObject(authService)
+                            .environmentObject(notificationService)
                     } else {
                         MainTabView()
                             .environmentObject(authService)
+                            .environmentObject(notificationService)
                     }
                 } else {
                     AuthView()
@@ -51,8 +54,16 @@ struct messageAIApp: App {
                 }
             }
             .preferredColorScheme(.light)
+            .task {
+                await setupNotifications()
+            }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 handleScenePhaseChange(from: oldPhase, to: newPhase)
+            }
+            .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
+                if isAuthenticated, !authService.needsOnboarding {
+                    registerNotificationToken()
+                }
             }
         }
         .modelContainer(sharedModelContainer)
@@ -92,6 +103,49 @@ struct messageAIApp: App {
                 }
             } catch {
                 print("❌ Failed to update presence: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Notification Setup
+
+    /// Setup push notifications on app launch
+    private func setupNotifications() async {
+        do {
+            // Check if permissions are already granted
+            let status = await notificationService.checkPermissionStatus()
+
+            switch status {
+            case .notDetermined:
+                // Request permissions for the first time
+                try await notificationService.requestPermissions()
+                print("✅ Notification permissions requested")
+            case .authorized, .provisional, .ephemeral:
+                // Permissions already granted
+                notificationService.permissionGranted = true
+                print("✅ Notification permissions already granted")
+            case .denied:
+                print("⚠️ Notification permissions denied by user")
+            @unknown default:
+                break
+            }
+        } catch {
+            print("❌ Failed to setup notifications: \(error.localizedDescription)")
+        }
+    }
+
+    /// Register FCM token for the current user
+    private func registerNotificationToken() {
+        guard let userId = authService.currentUser?.id else {
+            return
+        }
+
+        Task {
+            do {
+                try await notificationService.registerToken(userId: userId)
+                print("✅ FCM token registered for user: \(userId)")
+            } catch {
+                print("❌ Failed to register FCM token: \(error.localizedDescription)")
             }
         }
     }

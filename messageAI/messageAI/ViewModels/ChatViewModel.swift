@@ -96,14 +96,23 @@ class ChatViewModel: ObservableObject {
         conversationService: ConversationService? = nil,
         localStorageService: LocalStorageService? = nil,
         authService: AuthService? = nil,
-        presenceService: PresenceService? = nil
+        presenceService: PresenceService? = nil,
+        notificationService: NotificationService? = nil
     ) {
         self.conversationId = conversationId
 
         // Use dependency injection or create defaults
         let localStorage = localStorageService ?? LocalStorageService()
         self.localStorageService = localStorage
-        self.messageService = messageService ?? MessageService(localStorageService: localStorage)
+        
+        let msgService = messageService ?? MessageService(localStorageService: localStorage, notificationService: notificationService)
+        self.messageService = msgService
+        
+        // Set notification service if provided
+        if let notifService = notificationService {
+            msgService.setNotificationService(notifService)
+        }
+        
         self.conversationService = conversationService ?? ConversationService(localStorageService: localStorage)
         self.authService = authService ?? AuthService()
         self.presenceService = presenceService ?? PresenceService()
