@@ -1320,32 +1320,32 @@ MessageAI/
 **Branch:** `feature/typing-indicators`
 
 ### Subtasks:
-- [ ] Add typing indicator logic to MessageService
-  - **Files Edited:** `Services/MessageService.swift`
-  - `setTyping(conversationId: String, isTyping: Bool) async throws`
-  - Write to temporary Firestore subcollection with TTL
+- [x] Add typing indicator logic to MessageService
+  - **Files Edited:** `Services/MessageService.swift` ✅
+  - `setTyping(conversationId: String, isTyping: Bool) async throws` ✅
+  - Write to temporary Firestore subcollection with TTL ✅
   
-- [ ] Add typing state listener
-  - **Files Edited:** `Services/MessageService.swift`
-  - `startListeningForTyping(conversationId: String)`
-  - Listen to typing subcollection
-  - Update @Published var typingUsers
+- [x] Add typing state listener
+  - **Files Edited:** `Services/MessageService.swift` ✅
+  - `startListeningForTyping(conversationId: String)` ✅
+  - Listen to typing subcollection ✅
+  - Update @Published var typingUsers ✅
   
-- [ ] Add typing detection in MessageInputView
-  - **Files Edited:** `Views/Chat/MessageInputView.swift`
-  - On text change → set typing = true
-  - Debounce for 3 seconds → set typing = false
+- [x] Add typing detection in MessageInputView
+  - **Files Edited:** `Views/Chat/MessageInputView.swift` ✅
+  - On text change → set typing = true ✅
+  - Debounce for 3 seconds → set typing = false ✅
   
-- [ ] Update TypingIndicatorView
-  - **Files Edited:** `Views/Chat/TypingIndicatorView.swift`
-  - Show "User is typing..." for 1-on-1
-  - Show "User X is typing..." for groups
-  - Animated dots
+- [x] Update TypingIndicatorView
+  - **Files Edited:** `Views/Chat/TypingIndicatorView.swift` ✅
+  - Show "User is typing..." for 1-on-1 ✅
+  - Show "User X is typing..." for groups ✅
+  - Animated dots ✅
   
-- [ ] Add typing indicator to ChatView
-  - **Files Edited:** `Views/Chat/ChatView.swift`
-  - Show TypingIndicatorView when someone is typing
-  - Position above message input
+- [x] Add typing indicator to ChatView
+  - **Files Edited:** `Views/Chat/ChatView.swift` ✅
+  - Show TypingIndicatorView when someone is typing ✅
+  - Position above message input ✅
 
 ### Testing:
 - [ ] Create typing indicators integration tests
@@ -1363,8 +1363,15 @@ MessageAI/
   - Test animated dots display
 
 ### Files Summary:
-- **Edited:** `Services/MessageService.swift`, `Views/Chat/MessageInputView.swift`, `Views/Chat/TypingIndicatorView.swift`, `Views/Chat/ChatView.swift`
-- **Tests Created:** `MessageAITests/Integration/TypingIndicatorTests.swift`, `MessageAIUITests/TypingIndicatorUITests.swift`
+- **Edited:** 
+  - `Services/MessageService.swift` (setTyping, startListeningForTyping) ✅
+  - `ViewModels/ChatViewModel.swift` (onMessageTextChanged, typing debounce) ✅
+  - `Views/Chat/MessageInputView.swift` (onTextChanged callback) ✅
+  - `Views/Chat/TypingIndicatorView.swift` (animated UI) ✅
+  - `Views/Chat/ChatView.swift` (typing indicator display) ✅
+- **Tests Created:** None yet (deferred)
+- **Build Status:** ✅ PASSING
+- **Status:** ✅ PR #17 COMPLETE - Typing indicators fully functional (tests deferred to PR #20)
 
 ---
 
