@@ -16,8 +16,7 @@ struct ConversationRowView: View {
     let displayName: String
     let subtitle: String
     let photoURL: String?
-
-    @State private var unreadCount: Int = 0
+    let unreadCount: Int
 
     // MARK: - Body
 
@@ -155,7 +154,7 @@ struct ConversationRowView: View {
 
 #Preview {
     VStack(spacing: 0) {
-        // One-on-one conversation
+        // One-on-one conversation with unread messages
         ConversationRowView(
             conversation: Conversation(
                 id: "1",
@@ -172,7 +171,8 @@ struct ConversationRowView: View {
             ),
             displayName: "Alice",
             subtitle: "Hey! How are you doing?",
-            photoURL: nil
+            photoURL: nil,
+            unreadCount: 3
         )
 
         Divider()
@@ -194,7 +194,8 @@ struct ConversationRowView: View {
             ),
             displayName: "Team Project",
             subtitle: "Let's meet tomorrow at 3pm",
-            photoURL: nil
+            photoURL: nil,
+            unreadCount: 0
         )
 
         Divider()
@@ -216,7 +217,8 @@ struct ConversationRowView: View {
             ),
             displayName: "David",
             subtitle: "No messages yet",
-            photoURL: nil
+            photoURL: nil,
+            unreadCount: 0
         )
     }
     .background(UIStyleGuide.Colors.background)

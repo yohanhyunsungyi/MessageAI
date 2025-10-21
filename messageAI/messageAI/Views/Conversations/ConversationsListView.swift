@@ -23,79 +23,88 @@ struct ConversationsListView: View {
     @State private var conversationService: ConversationService?
     @StateObject private var vmWrapper = ConversationsViewModelWrapper()
     @State private var showError = false
-    
+
     private var conversationsViewModel: ConversationsViewModel? {
-        vmWrapper.vm
+        vmWrapper.viewModel
     }
 
     // MARK: - Body
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Background
-                UIStyleGuide.Colors.background
-                    .ignoresSafeArea()
-
-                if let vm = conversationsViewModel {
-                    let _ = print("🎨 Rendering: \(vm.filteredConversations.count) filtered conversations")
-                    
-                    if vm.isLoading && vm.conversations.isEmpty {
-                        loadingView
-                    } else if vm.filteredConversations.isEmpty {
-                        emptyStateView(viewModel: vm)
-                    } else {
-                        conversationsListView(viewModel: vm)
-                    }
-                } else {
-                    let _ = print("🎨 ConversationsListView: ViewModel is nil")
-                    loadingView
-                }
-            }
-            .navigationTitle("Messages")
-            .navigationBarTitleDisplayMode(.large)
-            .searchable(
-                text: Binding(
-                    get: { conversationsViewModel?.searchText ?? "" },
-                    set: { conversationsViewModel?.searchText = $0 }
-                ),
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search conversations"
-            )
-            .refreshable {
-                await conversationsViewModel?.refresh()
-            }
-            .navigationDestination(for: String.self) { conversationId in
-                ChatView(
-                    conversationId: conversationId,
-                    localStorageService: LocalStorageService(modelContext: modelContext)
+            mainContent
+                .navigationTitle("Messages")
+                .navigationBarTitleDisplayMode(.large)
+                .searchable(
+                    text: searchTextBinding,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Search conversations"
                 )
-            }
-            .alert("Error", isPresented: $showError) {
-                Button("OK") {
-                    conversationsViewModel?.clearError()
+                .refreshable {
+                    await conversationsViewModel?.refresh()
                 }
-            } message: {
-                if let error = conversationsViewModel?.errorMessage {
-                    Text(error)
+                .navigationDestination(for: String.self) { conversationId in
+                    ChatView(
+                        conversationId: conversationId,
+                        localStorageService: LocalStorageService(modelContext: modelContext)
+                    )
                 }
-            }
-            .task {
-                if !hasSetup {
-                    setupViewModel()
-                    hasSetup = true
+                .alert("Error", isPresented: $showError) {
+                    Button("OK") {
+                        conversationsViewModel?.clearError()
+                    }
+                } message: {
+                    if let error = conversationsViewModel?.errorMessage {
+                        Text(error)
+                    }
                 }
-            }
-            .onDisappear {
-                conversationsViewModel?.stopListening()
-            }
-            .onChange(of: conversationsViewModel?.errorMessage) { _, newValue in
-                showError = newValue != nil
-            }
-            .onChange(of: conversationsViewModel?.conversations.count ?? 0) { oldValue, newValue in
-                print("🔄 Conversations count changed: \(oldValue) → \(newValue)")
+                .task {
+                    if !hasSetup {
+                        setupViewModel()
+                        hasSetup = true
+                    }
+                }
+                .onDisappear {
+                    conversationsViewModel?.stopListening()
+                }
+                .onChange(of: conversationsViewModel?.errorMessage) { _, newValue in
+                    showError = newValue != nil
+                }
+        }
+    }
+
+    // MARK: - Main Content
+
+    private var mainContent: some View {
+        ZStack {
+            UIStyleGuide.Colors.background
+                .ignoresSafeArea()
+
+            if let viewModel = conversationsViewModel {
+                contentView(viewModel: viewModel)
+            } else {
+                loadingView
             }
         }
+    }
+
+    private func contentView(viewModel: ConversationsViewModel) -> some View {
+        Group {
+            if viewModel.isLoading && viewModel.conversations.isEmpty {
+                loadingView
+            } else if viewModel.filteredConversations.isEmpty {
+                emptyStateView(viewModel: viewModel)
+            } else {
+                conversationsListView(viewModel: viewModel)
+            }
+        }
+    }
+
+    private var searchTextBinding: Binding<String> {
+        Binding(
+            get: { conversationsViewModel?.searchText ?? "" },
+            set: { conversationsViewModel?.searchText = $0 }
+        )
     }
 
     // MARK: - Loading View
@@ -150,15 +159,14 @@ struct ConversationsListView: View {
     // MARK: - Conversations List View
 
     private func conversationsListView(viewModel: ConversationsViewModel) -> some View {
-        let _ = print("📋 Rendering list with \(viewModel.filteredConversations.count) items")
-        
-        return List(viewModel.filteredConversations, id: \.id) { conversation in
+        List(viewModel.filteredConversations, id: \.id) { conversation in
             NavigationLink(value: conversation.id) {
                 ConversationRowView(
                     conversation: conversation,
                     displayName: viewModel.getConversationName(conversation),
                     subtitle: viewModel.getConversationSubtitle(conversation),
-                    photoURL: viewModel.getConversationPhotoURL(conversation)
+                    photoURL: viewModel.getConversationPhotoURL(conversation),
+                    unreadCount: 0 // TODO: Calculate actual unread count from MessageService
                 )
             }
             .listRowInsets(EdgeInsets())
@@ -169,26 +177,25 @@ struct ConversationsListView: View {
         .background(UIStyleGuide.Colors.background)
     }
 
-
     // MARK: - Helper Methods
 
     private func setupViewModel() {
         // Initialize services with proper ModelContext
         let localStorageService = LocalStorageService(modelContext: modelContext)
         let service = ConversationService(localStorageService: localStorageService)
-        let vm = ConversationsViewModel(
+        let viewModel = ConversationsViewModel(
             conversationService: service,
             authService: authService
         )
 
         // Update state
         conversationService = service
-        vmWrapper.vm = vm
+        vmWrapper.viewModel = viewModel
 
         // Load data
         Task {
-            await vm.loadConversations()
-            vm.startListening()
+            await viewModel.loadConversations()
+            viewModel.startListening()
         }
     }
 }
@@ -197,15 +204,15 @@ struct ConversationsListView: View {
 
 @MainActor
 class ConversationsViewModelWrapper: ObservableObject {
-    @Published var vm: ConversationsViewModel? {
+    @Published var viewModel: ConversationsViewModel? {
         didSet {
             // Forward ViewModel's objectWillChange to this wrapper
-            cancellable = vm?.objectWillChange.sink { [weak self] _ in
+            cancellable = viewModel?.objectWillChange.sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
         }
     }
-    
+
     private var cancellable: AnyCancellable?
 }
 

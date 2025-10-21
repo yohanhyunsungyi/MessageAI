@@ -33,7 +33,7 @@ struct MessageBubbleView: View {
                     .padding(.leading, 40) // Align with bubble (avatar width + spacing)
                     .padding(.bottom, 2)
             }
-            
+
             HStack(alignment: .bottom, spacing: 8) {
                 if !isFromCurrentUser {
                     // Avatar for received messages
@@ -69,9 +69,9 @@ struct MessageBubbleView: View {
             }
         }
     }
-    
+
     // MARK: - Computed Properties
-    
+
     private var alignment: HorizontalAlignment {
         isFromCurrentUser ? .trailing : .leading
     }
@@ -137,34 +137,39 @@ struct MessageBubbleView: View {
         Group {
             switch message.status {
             case .sending:
+                // Clock icon for messages being sent
                 Image(systemName: "clock")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(UIStyleGuide.Colors.textTertiary)
 
             case .sent:
+                // Single checkmark for sent (reached server)
                 Image(systemName: "checkmark")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(UIStyleGuide.Colors.textTertiary)
 
             case .delivered:
-                HStack(spacing: -2) {
+                // Double checkmark for delivered
+                HStack(spacing: -3) {
                     Image(systemName: "checkmark")
                     Image(systemName: "checkmark")
                 }
-                .font(.system(size: 10))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundColor(UIStyleGuide.Colors.textTertiary)
 
             case .read:
-                HStack(spacing: -2) {
+                // Blue double checkmark for read (WhatsApp style)
+                HStack(spacing: -3) {
                     Image(systemName: "checkmark")
                     Image(systemName: "checkmark")
                 }
-                .font(.system(size: 10))
-                .foregroundColor(UIStyleGuide.Colors.primary)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Color(hex: "34B7F1")) // Blue checkmark
 
             case .failed:
+                // Red exclamation for failed messages
                 Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(UIStyleGuide.Colors.error)
             }
         }
@@ -204,12 +209,12 @@ struct MessageBubbleView: View {
 struct BubbleShape: Shape {
     var isFromCurrentUser: Bool
     var position: MessagePositionInSequence
-    
+
     func path(in rect: CGRect) -> Path {
         let cornerRadius = UIStyleGuide.CornerRadius.large
-        
+
         var corners: UIRectCorner = []
-        
+
         switch position {
         case .single:
             corners = .allCorners
@@ -238,13 +243,13 @@ struct BubbleShape: Shape {
                 corners.insert(.topRight)
             }
         }
-        
+
         let path = UIBezierPath(
             roundedRect: rect,
             byRoundingCorners: corners,
             cornerRadii: CGSize(width: cornerRadius, height: cornerRadius)
         )
-        
+
         return Path(path.cgPath)
     }
 }
