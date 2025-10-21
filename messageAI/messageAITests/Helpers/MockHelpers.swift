@@ -6,11 +6,12 @@
 //
 
 import Foundation
+@testable import messageAI
 
 /// Mock data and helpers for unit testing
 class MockHelpers {
 
-    // MARK: - Mock User Data
+    // MARK: - Mock User Data (Dictionary)
 
     static func mockUser(
         id: String = "user123",
@@ -31,7 +32,7 @@ class MockHelpers {
         ]
     }
 
-    // MARK: - Mock Message Data
+    // MARK: - Mock Message Data (Dictionary)
 
     static func mockMessage(
         id: String = "msg123",
@@ -53,6 +54,50 @@ class MockHelpers {
             "deliveredTo": [:] as [String: Date],
             "localId": NSNull()
         ]
+    }
+
+    // MARK: - Mock Model Objects
+
+    static func mockMessage(
+        id: String = "msg123",
+        conversationId: String = "conv123",
+        senderId: String = "user123",
+        text: String = "Hello, World!"
+    ) -> Message {
+        return Message(
+            id: id,
+            senderId: senderId,
+            senderName: "Test User",
+            senderPhotoURL: nil,
+            text: text,
+            timestamp: Date(),
+            status: .sent,
+            readBy: [:],
+            deliveredTo: [:],
+            localId: nil
+        )
+    }
+
+    static func mockConversation(
+        id: String = "conv123",
+        participantIds: [String] = ["user123", "user456"]
+    ) -> Conversation {
+        return Conversation(
+            id: id,
+            participantIds: participantIds,
+            participantNames: [
+                "user123": "Test User 1",
+                "user456": "Test User 2"
+            ],
+            participantPhotos: [:],
+            lastMessage: nil,
+            lastMessageTimestamp: nil,
+            lastMessageSenderId: nil,
+            type: .oneOnOne,
+            groupName: nil,
+            createdAt: Date(),
+            createdBy: participantIds.first ?? ""
+        )
     }
 
     // MARK: - Mock Conversation Data

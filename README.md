@@ -202,18 +202,19 @@ See [Tasks.md](Tasks.md) for deployment checklist.
 - [x] Data Models (PR #3)
 - [x] Local Storage Service (PR #4)
 
-**Phase 2: Authentication & Users** 🚧 60% COMPLETE (PR #5-7 of 9)
+**Phase 2: Authentication & Users** ✅ 100% COMPLETE (PR #5-9 of 9)
 - [x] Authentication service (PR #5) ✅
 - [x] Auth UI (PR #6) ✅
 - [x] Onboarding flow (PR #7) ✅
-- [ ] Users list screen (PR #8)
-- [ ] Main Tab View & Navigation (PR #9)
+- [x] Users list screen (PR #8) ✅
+- [x] Main Tab View & Navigation (PR #9) ✅
 
-**Phase 3: Core Messaging** (PR #10-14)
-- [ ] Conversation service
-- [ ] Message service (local-first)
-- [ ] Chat UI
-- [ ] Read receipts
+**Phase 3: Core Messaging** 🚧 60% COMPLETE (PR #10-12 of 14)
+- [x] Conversation service (PR #10) ✅
+- [x] Conversations List UI (PR #11) ✅
+- [x] Message service (local-first) (PR #12) ✅
+- [ ] Chat UI (PR #13)
+- [ ] Read receipts (PR #14)
 
 **Phase 4: Advanced Features** (PR #15-18)
 - [ ] Group chat
@@ -296,7 +297,7 @@ Yohan Yi - [@yohanhyunsungyi](https://github.com/yohanhyunsungyi)
 
 ---
 
-**Last Updated:** October 20, 2025  
-**Status:** PR #1 Complete, Ready for PR #2  
+**Last Updated:** October 21, 2025  
+**Status:** PR #12 Complete, Ready for PR #13  
 **Build Status:** ✅ Passing
 

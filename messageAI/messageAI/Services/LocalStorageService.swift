@@ -23,19 +23,37 @@ class LocalStorageService: ObservableObject {
 
     /// Save a message to local storage
     func saveMessage(_ message: Message, conversationId: String) throws {
-        let localMessage = LocalMessage(
-            id: message.id,
-            conversationId: conversationId,
-            senderId: message.senderId,
-            senderName: message.senderName,
-            text: message.text,
-            timestamp: message.timestamp,
-            status: message.status.rawValue,
-            isPending: message.status == .sending || message.status == .failed,
-            localId: message.localId
+        // Check if message already exists
+        let descriptor = FetchDescriptor<LocalMessage>(
+            predicate: #Predicate { $0.id == message.id }
         )
-
-        modelContext.insert(localMessage)
+        
+        if let existingMessage = try modelContext.fetch(descriptor).first {
+            // Update existing message
+            existingMessage.conversationId = conversationId
+            existingMessage.senderId = message.senderId
+            existingMessage.senderName = message.senderName
+            existingMessage.text = message.text
+            existingMessage.timestamp = message.timestamp
+            existingMessage.status = message.status.rawValue
+            existingMessage.isPending = message.status == .sending || message.status == .failed
+            existingMessage.localId = message.localId
+        } else {
+            // Insert new message
+            let localMessage = LocalMessage(
+                id: message.id,
+                conversationId: conversationId,
+                senderId: message.senderId,
+                senderName: message.senderName,
+                text: message.text,
+                timestamp: message.timestamp,
+                status: message.status.rawValue,
+                isPending: message.status == .sending || message.status == .failed,
+                localId: message.localId
+            )
+            modelContext.insert(localMessage)
+        }
+        
         try modelContext.save()
     }
 
@@ -118,26 +136,53 @@ class LocalStorageService: ObservableObject {
 
     /// Save a conversation to local storage
     func saveConversation(_ conversation: Conversation) throws {
-        let localConversation = LocalConversation(
-            id: conversation.id,
-            participantIds: conversation.participantIds,
-            lastMessage: conversation.lastMessage,
-            lastMessageTimestamp: conversation.lastMessageTimestamp,
-            type: conversation.type.rawValue,
-            groupName: conversation.groupName
+        // Check if conversation already exists
+        let descriptor = FetchDescriptor<LocalConversation>(
+            predicate: #Predicate { $0.id == conversation.id }
         )
-
-        modelContext.insert(localConversation)
+        
+        if let existingConversation = try modelContext.fetch(descriptor).first {
+            // Update existing conversation
+            existingConversation.participantIds = conversation.participantIds
+            existingConversation.lastMessage = conversation.lastMessage
+            existingConversation.lastMessageTimestamp = conversation.lastMessageTimestamp
+            existingConversation.type = conversation.type.rawValue
+            existingConversation.groupName = conversation.groupName
+        } else {
+            // Insert new conversation
+            let localConversation = LocalConversation(
+                id: conversation.id,
+                participantIds: conversation.participantIds,
+                lastMessage: conversation.lastMessage,
+                lastMessageTimestamp: conversation.lastMessageTimestamp,
+                type: conversation.type.rawValue,
+                groupName: conversation.groupName
+            )
+            modelContext.insert(localConversation)
+        }
+        
         try modelContext.save()
     }
 
     /// Fetch all conversations
     func fetchConversations() throws -> [LocalConversation] {
-        let descriptor = FetchDescriptor<LocalConversation>(
-            sortBy: [SortDescriptor(\.lastMessageTimestamp, order: .reverse)]
-        )
-
-        return try modelContext.fetch(descriptor)
+        let descriptor = FetchDescriptor<LocalConversation>()
+        let conversations = try modelContext.fetch(descriptor)
+        
+        // Sort in Swift to handle optional lastMessageTimestamp
+        return conversations.sorted { conv1, conv2 in
+            // Put conversations with timestamps first, sorted newest to oldest
+            switch (conv1.lastMessageTimestamp, conv2.lastMessageTimestamp) {
+            case (.some(let date1), .some(let date2)):
+                return date1 > date2
+            case (.some, .none):
+                return true  // Conversations with messages come first
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                return false // Both nil, maintain order
+            }
+        }
     }
 
     /// Fetch a specific conversation
