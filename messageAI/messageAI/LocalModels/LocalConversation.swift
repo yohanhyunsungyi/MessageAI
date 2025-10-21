@@ -53,13 +53,31 @@ class LocalConversation {
     /// Convert to Conversation model
     func toConversation() -> Conversation? {
         guard let typeEnum = ConversationType(rawValue: type) else {
+            print("❌ Failed to parse conversation type: \(type)")
             return nil
         }
         
-        // Decode JSON strings
-        let participantIds = (try? JSONDecoder().decode([String].self, from: Data(participantIdsJSON.utf8))) ?? []
-        let participantNames = (try? JSONDecoder().decode([String: String].self, from: Data(participantNamesJSON.utf8))) ?? [:]
-        let participantPhotos = (try? JSONDecoder().decode([String: String?].self, from: Data(participantPhotosJSON.utf8))) ?? [:]
+        // Decode JSON strings with proper error handling
+        guard let participantIds = try? JSONDecoder().decode([String].self, from: Data(participantIdsJSON.utf8)) else {
+            print("❌ Failed to decode participantIds")
+            return nil
+        }
+        
+        guard let participantNames = try? JSONDecoder().decode([String: String].self, from: Data(participantNamesJSON.utf8)) else {
+            print("❌ Failed to decode participantNames")
+            return nil
+        }
+        
+        // Safely decode participantPhotos with nullable values
+        var participantPhotos: [String: String?] = [:]
+        if let data = participantPhotosJSON.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([String: String?].self, from: data) {
+            participantPhotos = decoded
+        } else {
+            // Fallback: create empty photo dict with nil values for each participant
+            print("⚠️ Failed to decode participantPhotos, using fallback")
+            participantPhotos = Dictionary(uniqueKeysWithValues: participantIds.map { ($0, nil) })
+        }
         
         return Conversation(
             id: id,

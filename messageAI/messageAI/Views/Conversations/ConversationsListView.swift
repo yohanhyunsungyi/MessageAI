@@ -21,8 +21,10 @@ struct ConversationsListView: View {
 
     @State private var hasSetup = false
     @State private var conversationService: ConversationService?
+    @State private var usersViewModel: UsersViewModel?
     @StateObject private var vmWrapper = ConversationsViewModelWrapper()
     @State private var showError = false
+    @State private var showCreateGroup = false
 
     private var conversationsViewModel: ConversationsViewModel? {
         vmWrapper.viewModel
@@ -35,6 +37,17 @@ struct ConversationsListView: View {
             mainContent
                 .navigationTitle("Messages")
                 .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showCreateGroup = true
+                        } label: {
+                            Image(systemName: "person.2.fill")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.black)
+                        }
+                    }
+                }
                 .searchable(
                     text: searchTextBinding,
                     placement: .navigationBarDrawer(displayMode: .always),
@@ -48,6 +61,17 @@ struct ConversationsListView: View {
                         conversationId: conversationId,
                         localStorageService: LocalStorageService(modelContext: modelContext)
                     )
+                }
+                .sheet(isPresented: $showCreateGroup) {
+                    NavigationStack {
+                        if let usersVM = usersViewModel,
+                           let conversationSvc = conversationService {
+                            CreateGroupView(
+                                usersViewModel: usersVM,
+                                conversationService: conversationSvc
+                            )
+                        }
+                    }
                 }
                 .alert("Error", isPresented: $showError) {
                     Button("OK") {
@@ -188,8 +212,13 @@ struct ConversationsListView: View {
             authService: authService
         )
 
+        // Initialize UsersViewModel for group creation
+        let userService = UserService()
+        let usersVM = UsersViewModel(userService: userService)
+
         // Update state
         conversationService = service
+        usersViewModel = usersVM
         vmWrapper.viewModel = viewModel
 
         // Load data

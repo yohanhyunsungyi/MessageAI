@@ -20,7 +20,7 @@ final class ConversationServiceTests: XCTestCase {
         try await super.setUp()
 
         // Create in-memory local storage for testing
-        mockLocalStorage = LocalStorageService(inMemory: true)
+        mockLocalStorage = LocalStorageService()
         service = ConversationService(localStorageService: mockLocalStorage)
     }
 
@@ -112,7 +112,7 @@ final class ConversationServiceTests: XCTestCase {
             participantIds: ["user1", "user2"]
         )
 
-        await mockLocalStorage.saveConversation(conversation)
+        try await mockLocalStorage.saveConversation(conversation)
 
         // When: Fetch conversations
         // (This will fail without Firebase, but shows the test structure)
@@ -129,7 +129,7 @@ final class ConversationServiceTests: XCTestCase {
             id: "conv1",
             participantIds: ["user1", "user2"]
         )
-        await mockLocalStorage.saveConversation(conversation)
+        try await mockLocalStorage.saveConversation(conversation)
 
         // When: Update last message
         let message = MockHelpers.mockMessage(
@@ -139,7 +139,7 @@ final class ConversationServiceTests: XCTestCase {
             text: "Hello World"
         )
 
-        await mockLocalStorage.updateConversationLastMessage(
+        try await mockLocalStorage.updateConversationLastMessage(
             conversationId: "conv1",
             lastMessage: "Hello World",
             timestamp: message.timestamp

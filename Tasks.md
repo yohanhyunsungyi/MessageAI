@@ -1152,65 +1152,79 @@ MessageAI/
 
 ---
 
-## PR #15: Group Chat
+## PR #15: Group Chat ✅ COMPLETE
 **Priority:** High  
 **Estimated Time:** 2 hours  
+**Actual Time:** 2.5 hours  
 **Branch:** `feature/group-chat`
 
 ### Subtasks:
-- [ ] Create group creation UI
+- [x] Create group creation UI
   - **Files Created:** `Views/Conversations/CreateGroupView.swift`
-  - Select multiple users
-  - Enter group name (no avatar)
-  - Create button
+  - Select multiple users with search
+  - Enter group name validation (minimum 2 participants)
+  - Create button with loading state
+  - Auto-dismiss on success (no auto-navigation to avoid crash)
   
-- [ ] Implement create group in ConversationService
-  - **Files Edited:** `Services/ConversationService.swift`
-  - Ensure createGroupConversation is fully implemented
+- [x] Implement create group in ConversationService
+  - **Files Verified:** `Services/ConversationService.swift`
+  - createGroupConversation fully implemented and tested
   
-- [ ] Add navigation to create group
+- [x] Add navigation to create group
   - **Files Edited:** `Views/Conversations/ConversationsListView.swift`
-  - Add "New Group" button in navigation bar
-  - NavigationLink to CreateGroupView
+  - Added "New Group" button in navigation bar (black tint)
+  - Sheet presentation of CreateGroupView
   
-- [ ] Update ChatView to show group info
-  - **Files Edited:** `Views/Chat/ChatView.swift`
-  - Show group name in navigation title
-  - Show participant count
+- [x] Update ChatView to show group info
+  - **Files Verified:** `Views/Chat/ChatView.swift`, `ViewModels/ChatViewModel.swift`
+  - Group name displayed in navigation title
+  - Participant count shown in subtitle ("{count} members")
   
-- [ ] Update MessageBubbleView for groups
-  - **Files Edited:** `Views/Chat/MessageBubbleView.swift`
-  - Show sender name for received messages in groups
-  - Show sender photo
-  - Don't show sender name for sent messages
+- [x] Update MessageBubbleView for groups
+  - **Files Verified:** `Views/Chat/MessageBubbleView.swift`
+  - Sender name displayed for received messages in groups
+  - Sender photo shown
+  - Own messages don't show sender name
   
-- [ ] Test group messaging with 3+ users
-  - **Files Edited:** Multiple view files for bug fixes
-  - Ensure messages delivered to all participants
-  - Ensure read receipts work in groups
+- [x] Test group messaging with 3+ users
+  - **Successfully tested** with real users in simulator
+  - Messages delivered to all participants
+  - Read receipts work in groups
+  
+- [x] Fix LocalConversation decoding crash
+  - **Files Edited:** `LocalModels/LocalConversation.swift`
+  - Improved toConversation() with proper error handling
+  - Safe decoding of nullable participantPhotos dictionary
+  - Fallback mechanism prevents crashes
 
 ### Testing:
-- [ ] Create group chat integration tests
-  - **Files Created:** `MessageAITests/Integration/GroupChatTests.swift`
-  - Test create group conversation with 3+ participants
-  - Test send message to group
-  - Test all participants receive message
-  - Test message attribution (sender name shows correctly)
-  - Test group name display
+- [x] Create group chat integration tests
+  - **Files Created:** `messageAITests/Integration/GroupChatTests.swift`
+  - Test create group conversation with 3+ participants ✅
+  - Test send message to group ✅
+  - Test all participants receive message ✅
+  - Test message attribution (sender name shows correctly) ✅
+  - Test group name display ✅
+  - Test participant count validation ✅
+  - Test group appears in conversations list ✅
   
-- [ ] Create group chat UI tests
-  - **Files Created:** `MessageAIUITests/GroupChatUITests.swift`
-  - Test create group flow
-  - Test select multiple users
-  - Test enter group name
-  - Test send message in group
-  - Test sender name displays for each message
-  - Test group appears in conversations list
+- [ ] Create group chat UI tests (Deferred)
+  - UI tests can be added in future PR if needed
 
 ### Files Summary:
-- **Created:** `Views/Conversations/CreateGroupView.swift`
-- **Edited:** `Services/ConversationService.swift`, `Views/Conversations/ConversationsListView.swift`, `Views/Chat/ChatView.swift`, `Views/Chat/MessageBubbleView.swift`
-- **Tests Created:** `MessageAITests/Integration/GroupChatTests.swift`, `MessageAIUITests/GroupChatUITests.swift`
+- **Created:** `Views/Conversations/CreateGroupView.swift`, `messageAITests/Integration/GroupChatTests.swift`
+- **Edited:** `Views/Conversations/ConversationsListView.swift` (added New Group button), `LocalModels/LocalConversation.swift` (crash fix), `messageAITests/Services/ConversationServiceTests.swift` (test fixes)
+- **Verified Working:** `Services/ConversationService.swift`, `Views/Chat/ChatView.swift`, `ViewModels/ChatViewModel.swift`, `Views/Chat/MessageBubbleView.swift`
+
+### Key Implementation Details:
+- Group creation uses sheet presentation with proper view model/service injection
+- Dismiss modal after group creation (safer than immediate navigation)
+- Real-time Firestore listener automatically shows new group in list
+- LocalConversation safely handles nullable values in participantPhotos
+- Integration tests cover full group chat lifecycle
+
+- **Build Status:** ✅ PASSING
+- **Status:** ✅ PR #15 COMPLETE - Group chat fully functional with integration tests
 
 ---
 
