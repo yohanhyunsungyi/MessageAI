@@ -12,6 +12,8 @@ import FirebaseCore
 @main
 struct messageAIApp: App {
     @StateObject private var authService = AuthService()
+    @StateObject private var presenceService = PresenceService()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // Configure Firebase
@@ -49,7 +51,48 @@ struct messageAIApp: App {
                 }
             }
             .preferredColorScheme(.light)
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                handleScenePhaseChange(from: oldPhase, to: newPhase)
+            }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    // MARK: - App Lifecycle Handling
+
+    /// Handle app lifecycle changes for presence updates
+    /// - Parameters:
+    ///   - oldPhase: Previous scene phase
+    ///   - newPhase: New scene phase
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        guard let userId = authService.currentUser?.id else {
+            return
+        }
+
+        Task {
+            do {
+                switch newPhase {
+                case .active:
+                    // App became active (foreground)
+                    try await presenceService.setOnline(userId: userId)
+                    print("🟢 App became active - User set to online")
+
+                case .inactive:
+                    // App became inactive (transitioning)
+                    // Don't update presence during transition
+                    print("🟡 App became inactive")
+
+                case .background:
+                    // App moved to background
+                    try await presenceService.setOffline(userId: userId)
+                    print("🔴 App moved to background - User set to offline")
+
+                @unknown default:
+                    break
+                }
+            } catch {
+                print("❌ Failed to update presence: \(error.localizedDescription)")
+            }
+        }
     }
 }

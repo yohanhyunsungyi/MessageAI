@@ -26,10 +26,12 @@ class ChatViewModel: ObservableObject {
     private let conversationService: ConversationService
     private let localStorageService: LocalStorageService
     private let authService: AuthService
+    private let presenceService: PresenceService
 
     private var conversationId: String
     private var cancellables = Set<AnyCancellable>()
     private var typingDebounceTimer: Timer?
+    private var otherParticipantId: String?
 
     // MARK: - Computed Properties
 
@@ -63,11 +65,21 @@ class ChatViewModel: ObservableObject {
 
     var navigationSubtitle: String? {
         if let conversation = conversation, conversation.type == .oneOnOne {
-            // Show online status or "typing..." for 1-on-1 chats
+            // Show "typing..." first if someone is typing
             if !typingUsers.isEmpty {
                 return "typing..."
             }
-            // Could add presence check here later
+
+            // Show online status for 1-on-1 chats
+            if let otherUserId = otherParticipantId {
+                if presenceService.isUserOnline(otherUserId) {
+                    return "Online"
+                } else {
+                    // Show "Last seen..." if offline
+                    return "Offline"
+                }
+            }
+
             return nil
         } else if let conversation = conversation, conversation.type == .group {
             let participantCount = conversation.participantIds.count
@@ -83,7 +95,8 @@ class ChatViewModel: ObservableObject {
         messageService: MessageService? = nil,
         conversationService: ConversationService? = nil,
         localStorageService: LocalStorageService? = nil,
-        authService: AuthService? = nil
+        authService: AuthService? = nil,
+        presenceService: PresenceService? = nil
     ) {
         self.conversationId = conversationId
 
@@ -93,6 +106,7 @@ class ChatViewModel: ObservableObject {
         self.messageService = messageService ?? MessageService(localStorageService: localStorage)
         self.conversationService = conversationService ?? ConversationService(localStorageService: localStorage)
         self.authService = authService ?? AuthService()
+        self.presenceService = presenceService ?? PresenceService()
 
         setupSubscriptions()
     }
@@ -116,6 +130,14 @@ class ChatViewModel: ObservableObject {
         messageService.$typingUsers
             .receive(on: DispatchQueue.main)
             .assign(to: &$typingUsers)
+
+        // Subscribe to presence updates to trigger UI refresh
+        presenceService.$presenceStates
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Lifecycle Methods
@@ -124,11 +146,13 @@ class ChatViewModel: ObservableObject {
         await loadConversation()
         await loadMessages()
         startListening()
+        startPresenceListening()
         await markMessagesAsRead()
     }
 
     func onDisappear() {
         stopListening()
+        stopPresenceListening()
         stopTypingIfNeeded()
     }
 
@@ -138,6 +162,12 @@ class ChatViewModel: ObservableObject {
         do {
             conversation = try await conversationService.getConversation(id: conversationId)
             print("Loaded conversation: \(conversationId)")
+
+            // Get other participant ID for 1-on-1 chats
+            if let conversation = conversation, conversation.type == .oneOnOne {
+                let otherUserIds = conversation.participantIds.filter { $0 != currentUserId }
+                otherParticipantId = otherUserIds.first
+            }
         } catch {
             print("Failed to load conversation: \(error)")
             // Don't set errorMessage here - conversation might still load from cache
@@ -162,6 +192,27 @@ class ChatViewModel: ObservableObject {
     private func stopListening() {
         messageService.stopListening()
         messageService.stopListeningForTyping()
+    }
+
+    // MARK: - Presence Listening
+
+    private func startPresenceListening() {
+        // Only listen for presence in 1-on-1 chats
+        guard let conversation = conversation,
+              conversation.type == .oneOnOne,
+              let otherUserId = otherParticipantId else {
+            return
+        }
+
+        presenceService.startListening(userId: otherUserId)
+        print("Started listening to presence for user: \(otherUserId)")
+    }
+
+    private func stopPresenceListening() {
+        if let otherUserId = otherParticipantId {
+            presenceService.stopListening(userId: otherUserId)
+            print("Stopped listening to presence for user: \(otherUserId)")
+        }
     }
 
     // MARK: - Message Sending
