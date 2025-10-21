@@ -9,9 +9,9 @@ import Foundation
 
 /// Mock data and helpers for unit testing
 class MockHelpers {
-    
+
     // MARK: - Mock User Data
-    
+
     static func mockUser(
         id: String = "user123",
         displayName: String = "Test User",
@@ -30,9 +30,9 @@ class MockHelpers {
             "createdAt": Date()
         ]
     }
-    
+
     // MARK: - Mock Message Data
-    
+
     static func mockMessage(
         id: String = "msg123",
         senderId: String = "user123",
@@ -45,18 +45,18 @@ class MockHelpers {
             "id": id,
             "senderId": senderId,
             "senderName": senderName,
-            "senderPhotoURL": nil as Any,
+            "senderPhotoURL": NSNull(),
             "text": text,
             "timestamp": timestamp,
             "status": status,
             "readBy": [:] as [String: Date],
             "deliveredTo": [:] as [String: Date],
-            "localId": nil as Any
+            "localId": NSNull()
         ]
     }
-    
+
     // MARK: - Mock Conversation Data
-    
+
     static func mockConversation(
         id: String = "conv123",
         participantIds: [String] = ["user123", "user456"],
@@ -72,18 +72,18 @@ class MockHelpers {
                 "user456": "Test User 2"
             ],
             "participantPhotos": [:] as [String: String?],
-            "lastMessage": lastMessage as Any,
-            "lastMessageTimestamp": lastMessageTimestamp as Any,
-            "lastMessageSenderId": participantIds.first as Any,
+            "lastMessage": lastMessage ?? NSNull(),
+            "lastMessageTimestamp": lastMessageTimestamp ?? NSNull(),
+            "lastMessageSenderId": participantIds.first ?? NSNull(),
             "type": type,
-            "groupName": nil as Any,
+            "groupName": NSNull(),
             "createdAt": Date(),
             "createdBy": participantIds.first ?? ""
         ]
     }
-    
+
     // MARK: - Mock Group Conversation Data
-    
+
     static func mockGroupConversation(
         id: String = "group123",
         participantIds: [String] = ["user123", "user456", "user789"],
@@ -108,36 +108,36 @@ class MockHelpers {
             "createdBy": participantIds.first ?? ""
         ]
     }
-    
+
     // MARK: - Test Credentials
-    
+
     static let testEmail1 = "test1@messageai.com"
     static let testEmail2 = "test2@messageai.com"
     static let testEmail3 = "test3@messageai.com"
     static let testPassword = "TestPassword123!"
-    
+
     // MARK: - Helper Methods
-    
+
     /// Generate a unique test email
     static func uniqueTestEmail() -> String {
         return "test_\(UUID().uuidString.prefix(8))@messageai.com"
     }
-    
+
     /// Generate a unique test user ID
     static func uniqueUserId() -> String {
         return "user_\(UUID().uuidString)"
     }
-    
+
     /// Generate a unique conversation ID
     static func uniqueConversationId() -> String {
         return "conv_\(UUID().uuidString)"
     }
-    
+
     /// Generate a unique message ID
     static func uniqueMessageId() -> String {
         return "msg_\(UUID().uuidString)"
     }
-    
+
     /// Create a delay for async testing
     static func wait(seconds: TimeInterval) async {
         try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
@@ -149,15 +149,13 @@ class MockHelpers {
 import XCTest
 
 extension XCTestCase {
-    
-    /// Wait for an async expectation
-    func waitForExpectation(timeout: TimeInterval = 5.0, handler: XCWaitCompletionHandler? = nil) async {
-        await fulfillment(of: [], timeout: timeout)
-    }
-    
     /// Assert that a value is not nil and return it
-    func XCTUnwrapAsync<T>(_ expression: @autoclosure () throws -> T?, _ message: String = "", file: StaticString = #file, line: UInt = #line) throws -> T {
+    func XCTUnwrapAsync<T>(
+        _ expression: @autoclosure () throws -> T?,
+        _ message: String = "",
+        file: StaticString = #file,
+        line: UInt = #line
+    ) throws -> T {
         return try XCTUnwrap(try expression(), message, file: file, line: line)
     }
 }
-

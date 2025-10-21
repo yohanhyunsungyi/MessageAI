@@ -73,6 +73,9 @@ fastlane/test_output
 *~
 .tmp/
 temp/
+*.backup
+*.backup[0-9]
+*.backup[0-9][0-9]
 
 # Archives
 *.zip
@@ -80,4 +83,7 @@ temp/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Screenshots and images (add specific ones to git if needed)
+Screenshot*.png
 

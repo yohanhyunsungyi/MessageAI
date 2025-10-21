@@ -11,15 +11,17 @@ import FirebaseCore
 
 @main
 struct messageAIApp: App {
-    
+    @StateObject private var authService = AuthService()
+
     init() {
         // Configure Firebase
         FirebaseApp.configure()
     }
-    
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            LocalMessage.self,
+            LocalConversation.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -32,7 +34,21 @@ struct messageAIApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if authService.isAuthenticated {
+                    if authService.needsOnboarding {
+                        OnboardingView()
+                            .environmentObject(authService)
+                    } else {
+                        MainTabView()
+                            .environmentObject(authService)
+                    }
+                } else {
+                    AuthView()
+                        .environmentObject(authService)
+                }
+            }
+            .preferredColorScheme(.light)
         }
         .modelContainer(sharedModelContainer)
     }
