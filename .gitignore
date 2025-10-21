@@ -1,0 +1,83 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+## User settings
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+
+## Build generated
+build/
+DerivedData/
+
+## Xcode Patch
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Firebase
+**/GoogleService-Info.plist
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Firebase Emulator data
+*-emulator-export/
+*.log
+
+# Credentials and sensitive files
+.env
+.env.local
+secrets/
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+*.coverage
+.nyc_output
+
+# Node modules (if using Cloud Functions)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# iOS
+## Pods
+Pods/
+Podfile.lock
+
+## Carthage
+Carthage/Build/
+
+## fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Temporary files
+*.swp
+*.swo
+*~
+.tmp/
+temp/
+
+# Archives
+*.zip
+*.tar.gz
+*.ipa
+*.dSYM.zip
+*.dSYM
+
