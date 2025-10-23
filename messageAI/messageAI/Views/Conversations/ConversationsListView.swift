@@ -26,6 +26,8 @@ struct ConversationsListView: View {
     @StateObject private var vmWrapper = ConversationsViewModelWrapper()
     @State private var showError = false
     @State private var showCreateGroup = false
+    @State private var navigationPath = NavigationPath()
+    @State private var pendingNavigationConversationId: String?
 
     private var conversationsViewModel: ConversationsViewModel? {
         vmWrapper.viewModel
@@ -34,7 +36,7 @@ struct ConversationsListView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             mainContent
                 .navigationTitle("Messages")
                 .navigationBarTitleDisplayMode(.large)
@@ -46,7 +48,14 @@ struct ConversationsListView: View {
                             Image(systemName: "person.2.fill")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.black)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(UIStyleGuide.Colors.primary)
+                                .clipShape(Capsule())
+                                .contentShape(Capsule())
                         }
+                        .buttonStyle(.plain)
+                        .buttonBorderShape(.capsule)
                     }
                 }
                 .searchable(
@@ -60,7 +69,8 @@ struct ConversationsListView: View {
                 .navigationDestination(for: String.self) { conversationId in
                     ChatView(
                         conversationId: conversationId,
-                        localStorageService: LocalStorageService(modelContext: modelContext)
+                        localStorageService: LocalStorageService(modelContext: modelContext),
+                        sharedMessageService: conversationsViewModel?.getSharedMessageService()
                     )
                 }
                 .sheet(isPresented: $showCreateGroup) {
@@ -69,9 +79,19 @@ struct ConversationsListView: View {
                            let conversationSvc = conversationService {
                             CreateGroupView(
                                 usersViewModel: usersVM,
-                                conversationService: conversationSvc
+                                conversationService: conversationSvc,
+                                onGroupCreated: { conversationId in
+                                    pendingNavigationConversationId = conversationId
+                                }
                             )
                         }
+                    }
+                }
+                .onChange(of: showCreateGroup) { oldValue, newValue in
+                    // Navigate to chat when sheet is dismissed and we have a pending conversation
+                    if !newValue, let conversationId = pendingNavigationConversationId {
+                        navigationPath.append(conversationId)
+                        pendingNavigationConversationId = nil
                     }
                 }
                 .alert("Error", isPresented: $showError) {
@@ -89,11 +109,23 @@ struct ConversationsListView: View {
                         hasSetup = true
                     }
                 }
+                .onAppear {
+                    // Restart listener when view appears (handles tab switches)
+                    conversationsViewModel?.startListening()
+                }
                 .onDisappear {
                     conversationsViewModel?.stopListening()
                 }
                 .onChange(of: conversationsViewModel?.errorMessage) { _, newValue in
                     showError = newValue != nil
+                }
+                .onReceive(NotificationCenter.default.publisher(
+                    for: NSNotification.Name(Constants.Notifications.openConversation)
+                )) { notification in
+                    if let conversationId = notification.userInfo?["conversationId"] as? String {
+                        print("📱 Received notification tap - navigating to: \(conversationId)")
+                        navigationPath.append(conversationId)
+                    }
                 }
         }
     }

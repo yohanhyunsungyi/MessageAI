@@ -29,6 +29,7 @@ class ConversationsViewModel: ObservableObject {
 
     private let conversationService: ConversationService
     private let authService: AuthService
+    private let messageService: MessageService
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
@@ -36,14 +37,28 @@ class ConversationsViewModel: ObservableObject {
     init(
         conversationService: ConversationService,
         authService: AuthService,
+        messageService: MessageService? = nil,
         notificationService: NotificationService? = nil
     ) {
         self.conversationService = conversationService
         self.authService = authService
 
+        // Create or use provided message service for background monitoring
+        if let msgService = messageService {
+            self.messageService = msgService
+        } else {
+            // Create a shared message service for monitoring
+            let localStorage = conversationService.localStorageService
+            self.messageService = MessageService(
+                localStorageService: localStorage,
+                notificationService: notificationService
+            )
+        }
+
         // Set notification service if provided
         if let notifService = notificationService {
             conversationService.setNotificationService(notifService)
+            self.messageService.setNotificationService(notifService)
         }
 
         setupBindings()
@@ -56,10 +71,14 @@ class ConversationsViewModel: ObservableObject {
         conversationService.$conversations
             .receive(on: DispatchQueue.main)
             .sink { [weak self] conversations in
+                guard let self = self else { return }
                 print("🔔 ConversationsViewModel received \(conversations.count) conversations")
-                self?.conversations = conversations
-                self?.filterConversations()
-                print("🔔 Filtered conversations: \(self?.filteredConversations.count ?? 0)")
+                self.conversations = conversations
+                self.filterConversations()
+                print("🔔 Filtered conversations: \(self.filteredConversations.count)")
+
+                // Automatically start monitoring all conversations for notifications
+                self.startMonitoringConversations()
             }
             .store(in: &cancellables)
 
@@ -99,6 +118,21 @@ class ConversationsViewModel: ObservableObject {
     /// Stop listening to conversation updates
     func stopListening() {
         conversationService.stopListening()
+        // Also stop all conversation monitoring
+        messageService.stopAllMonitoring()
+    }
+
+    /// Start monitoring all conversations for new messages (for notifications)
+    func startMonitoringConversations() {
+        print("🔔 Starting to monitor \(conversations.count) conversations")
+        for conversation in conversations {
+            messageService.startMonitoring(conversationId: conversation.id)
+        }
+    }
+
+    /// Get the shared message service (for ChatViewModel)
+    func getSharedMessageService() -> MessageService {
+        return messageService
     }
 
     /// Refresh conversations list

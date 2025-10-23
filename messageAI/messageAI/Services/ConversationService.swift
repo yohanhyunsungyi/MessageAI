@@ -23,7 +23,7 @@ class ConversationService: ObservableObject {
     // MARK: - Private Properties
 
     private let firestore: Firestore
-    private let localStorageService: LocalStorageService
+    let localStorageService: LocalStorageService  // Internal access for ConversationsViewModel
     private var conversationsListener: ListenerRegistration?
     private var notificationService: NotificationService?
     private var previousConversations: [String: Conversation] = [:]  // Track previous state for change detection
@@ -350,9 +350,12 @@ class ConversationService: ObservableObject {
                 print("✅ Successfully decoded \(conversations.count) conversations")
 
                 Task { @MainActor in
-                    // Detect new messages for notifications
-                    await self.detectNewMessagesAndNotify(conversations, userId: userId)
-                    
+                    // Update previous state for future change detection (no notifications here)
+                    // MessageService handles notifications for individual messages
+                    for conversation in conversations {
+                        self.previousConversations[conversation.id] = conversation
+                    }
+
                     // Update UI - Firestore is the source of truth
                     self.conversations = conversations
                     print("✅ Real-time update: \(conversations.count) conversations")
@@ -382,7 +385,10 @@ class ConversationService: ObservableObject {
     }
 
     // MARK: - Notification Detection
+    // NOTE: Notifications are now handled by MessageService to avoid duplicates
+    // This method is commented out but kept for reference
 
+    /*
     /// Detect new messages and show notifications
     private func detectNewMessagesAndNotify(_ conversations: [Conversation], userId: String) async {
         print("🔍 detectNewMessagesAndNotify called for \(conversations.count) conversations")
@@ -458,6 +464,7 @@ class ConversationService: ObservableObject {
         
         print("✅ detectNewMessagesAndNotify complete")
     }
+    */
 
     // MARK: - Helper Methods
 

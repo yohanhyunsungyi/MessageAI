@@ -6,14 +6,30 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ChatView: View {
-    @StateObject private var viewModel: ChatViewModel
     @EnvironmentObject private var notificationService: NotificationService
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var hasInitialized = false
+    @StateObject private var viewModelWrapper = ChatViewModelWrapper()
 
-    init(conversationId: String, localStorageService: LocalStorageService? = nil, notificationService: NotificationService? = nil) {
-        _viewModel = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, localStorageService: localStorageService, notificationService: notificationService))
+    let conversationId: String
+    let localStorageService: LocalStorageService?
+    let sharedMessageService: MessageService?
+
+    init(
+        conversationId: String,
+        localStorageService: LocalStorageService? = nil,
+        sharedMessageService: MessageService? = nil
+    ) {
+        self.conversationId = conversationId
+        self.localStorageService = localStorageService
+        self.sharedMessageService = sharedMessageService
+    }
+
+    private var viewModel: ChatViewModel? {
+        viewModelWrapper.viewModel
     }
 
     var body: some View {
@@ -21,47 +37,58 @@ struct ChatView: View {
             UIStyleGuide.Colors.cardBackground
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Messages List
-                messagesList
+            if let viewModel = viewModel {
+                VStack(spacing: 0) {
+                    // Messages List
+                    messagesList
 
-                // Typing Indicator
-                if !viewModel.typingUsers.isEmpty {
-                    TypingIndicatorView(
-                        typingUserNames: getTypingUserNames()
-                    )
-                    .padding(.horizontal, UIStyleGuide.Spacing.md)
-                    .padding(.top, UIStyleGuide.Spacing.sm)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
-                // Message Input
-                MessageInputView(
-                    text: $viewModel.messageText,
-                    canSend: viewModel.canSendMessage,
-                    onSend: {
-                        Task {
-                            await viewModel.sendMessage()
-                        }
-                    },
-                    onTextChanged: {
-                        viewModel.onMessageTextChanged()
+                    // Typing Indicator
+                    if !viewModel.typingUsers.isEmpty {
+                        TypingIndicatorView(
+                            typingUserNames: getTypingUserNames()
+                        )
+                        .padding(.horizontal, UIStyleGuide.Spacing.md)
+                        .padding(.top, UIStyleGuide.Spacing.sm)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
-                )
-                .background(Color.white)
+
+                    // Message Input
+                    if let vm = viewModelWrapper.viewModel {
+                        MessageInputView(
+                            text: Binding(
+                                get: { vm.messageText },
+                                set: { newValue in
+                                    vm.messageText = newValue
+                                }
+                            ),
+                            canSend: vm.canSendMessage,
+                            onSend: {
+                                Task {
+                                    await vm.sendMessage()
+                                }
+                            },
+                            onTextChanged: {
+                                vm.onMessageTextChanged()
+                            }
+                        )
+                        .background(Color.white)
+                    }
+                }
+            } else {
+                ProgressView()
             }
         }
-        .navigationTitle(viewModel.navigationTitle)
+        .navigationTitle(viewModel?.navigationTitle ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text(viewModel.navigationTitle)
+                    Text(viewModel?.navigationTitle ?? "")
                         .font(UIStyleGuide.Typography.bodyBold)
                         .foregroundColor(UIStyleGuide.Colors.textPrimary)
 
-                    if let subtitle = viewModel.navigationSubtitle {
+                    if let subtitle = viewModel?.navigationSubtitle {
                         Text(subtitle)
                             .font(UIStyleGuide.Typography.caption)
                             .foregroundColor(UIStyleGuide.Colors.textSecondary)
@@ -69,19 +96,37 @@ struct ChatView: View {
                 }
             }
         }
-        .task { await viewModel.onAppear() }
-        .onDisappear {
-            viewModel.onDisappear()
+        .task {
+            if !hasInitialized {
+                setupViewModel()
+                hasInitialized = true
+            }
+            if let vm = viewModel {
+                await vm.onAppear()
+            }
         }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+        .onDisappear {
+            viewModel?.onDisappear()
+        }
+        .alert("Error", isPresented: .constant(viewModel?.errorMessage != nil)) {
             Button("OK") {
-                viewModel.errorMessage = nil
+                viewModelWrapper.viewModel?.errorMessage = nil
             }
         } message: {
-            if let errorMessage = viewModel.errorMessage {
+            if let errorMessage = viewModel?.errorMessage {
                 Text(errorMessage)
             }
         }
+    }
+
+    private func setupViewModel() {
+        let vm = ChatViewModel(
+            conversationId: conversationId,
+            messageService: sharedMessageService,
+            localStorageService: localStorageService,
+            notificationService: notificationService
+        )
+        viewModelWrapper.setViewModel(vm)
     }
 
     // MARK: - Messages List
@@ -90,11 +135,11 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    if viewModel.errorMessage != nil {
+                    if viewModel?.errorMessage != nil {
                         errorStateView
-                    } else if viewModel.isLoading && viewModel.messages.isEmpty {
+                    } else if viewModel?.isLoading == true && viewModel?.messages.isEmpty == true {
                         loadingView
-                    } else if viewModel.messages.isEmpty {
+                    } else if viewModel?.messages.isEmpty == true {
                         emptyStateView
                     } else {
                         messagesContent
@@ -106,14 +151,14 @@ struct ChatView: View {
             .onAppear {
                 scrollProxy = proxy
             }
-            .onChange(of: viewModel.messages.count) { _, _ in
+            .onChange(of: viewModel?.messages.count ?? 0) { _, _ in
                 scrollToBottom(proxy: proxy)
             }
         }
     }
 
     private var messagesContent: some View {
-        ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+        ForEach(Array((viewModel?.messages ?? []).enumerated()), id: \.element.id) { index, message in
             VStack(alignment: .leading, spacing: 0) {
                 // Show date divider if needed
                 if shouldShowDateDivider(at: index) {
@@ -123,10 +168,10 @@ struct ChatView: View {
                 // Message bubble
                 MessageBubbleView(
                     message: message,
-                    isFromCurrentUser: viewModel.isMessageFromCurrentUser(message),
+                    isFromCurrentUser: viewModel?.isMessageFromCurrentUser(message) ?? false,
                     position: getMessagePosition(at: index),
-                    showSenderName: viewModel.shouldShowSenderName(for: message, at: index),
-                    conversation: viewModel.conversation
+                    showSenderName: viewModel?.shouldShowSenderName(for: message, at: index) ?? false,
+                    conversation: viewModel?.conversation
                 )
                 .id(message.id)
                 .padding(.top, topPaddingForMessage(at: index))
@@ -194,7 +239,7 @@ struct ChatView: View {
                 .font(UIStyleGuide.Typography.title3)
                 .foregroundColor(UIStyleGuide.Colors.textPrimary)
 
-            if let errorMessage = viewModel.errorMessage {
+            if let errorMessage = viewModel?.errorMessage {
                 Text(errorMessage)
                     .font(UIStyleGuide.Typography.bodySmall)
                     .foregroundColor(UIStyleGuide.Colors.textSecondary)
@@ -225,10 +270,10 @@ struct ChatView: View {
     // MARK: - Helper Methods
 
     private func shouldShowDateDivider(at index: Int) -> Bool {
-        guard index > 0 else { return true }
+        guard index > 0, let messages = viewModel?.messages, messages.count > index else { return true }
 
-        let currentMessage = viewModel.messages[index]
-        let previousMessage = viewModel.messages[index - 1]
+        let currentMessage = messages[index]
+        let previousMessage = messages[index - 1]
 
         return !Calendar.current.isDate(
             currentMessage.timestamp,
@@ -237,11 +282,15 @@ struct ChatView: View {
     }
 
     private func getMessagePosition(at index: Int) -> MessagePositionInSequence {
-        let currentMessage = viewModel.messages[index]
+        guard let viewModel = viewModel, let messages = viewModel.messages as? [Message], messages.count > index else {
+            return .single
+        }
+
+        let currentMessage = messages[index]
         let isFromCurrentUser = viewModel.isMessageFromCurrentUser(currentMessage)
 
-        let prevMessage = (index > 0) ? viewModel.messages[index - 1] : nil
-        let nextMessage = (index < viewModel.messages.count - 1) ? viewModel.messages[index + 1] : nil
+        let prevMessage = (index > 0) ? messages[index - 1] : nil
+        let nextMessage = (index < messages.count - 1) ? messages[index + 1] : nil
 
         let isPrevSameSender = (prevMessage?.senderId == currentMessage.senderId) && !shouldShowDateDivider(at: index)
         let isNextSameSender = (nextMessage?.senderId == currentMessage.senderId) && (nextMessage != nil ? !shouldShowDateDivider(at: index + 1) : false)
@@ -256,7 +305,7 @@ struct ChatView: View {
             return .single
         }
     }
-    
+
     private func topPaddingForMessage(at index: Int) -> CGFloat {
         let position = getMessagePosition(at: index)
         switch position {
@@ -268,7 +317,7 @@ struct ChatView: View {
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        guard let lastMessage = viewModel.messages.last else { return }
+        guard let lastMessage = viewModel?.messages.last else { return }
 
         withAnimation(.easeOut(duration: 0.3)) {
             proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -276,11 +325,39 @@ struct ChatView: View {
     }
 
     private func getTypingUserNames() -> [String] {
-        guard let conversation = viewModel.conversation else { return [] }
+        guard let conversation = viewModel?.conversation else { return [] }
 
-        return viewModel.typingUsers.compactMap { userId in
+        return viewModel?.typingUsers.compactMap { userId in
             conversation.participantNames[userId]
+        } ?? []
+    }
+}
+
+// MARK: - Wrapper
+
+@MainActor
+class ChatViewModelWrapper: ObservableObject {
+    @Published var viewModel: ChatViewModel? {
+        didSet {
+            // Cancel previous subscription
+            cancellable?.cancel()
+
+            // Forward objectWillChange from viewModel to wrapper
+            // This makes the view re-render when viewModel's @Published properties change
+            cancellable = viewModel?.objectWillChange.sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
         }
+    }
+
+    private var cancellable: AnyCancellable?
+
+    init() {
+        self.viewModel = nil
+    }
+
+    func setViewModel(_ viewModel: ChatViewModel) {
+        self.viewModel = viewModel
     }
 }
 
@@ -289,5 +366,6 @@ struct ChatView: View {
 #Preview {
     NavigationStack {
         ChatView(conversationId: "preview-conversation-id")
+            .environmentObject(NotificationService())
     }
 }

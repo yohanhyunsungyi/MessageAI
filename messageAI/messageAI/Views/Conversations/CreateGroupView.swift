@@ -20,11 +20,17 @@ struct CreateGroupView: View {
     @State private var showError = false
 
     private let currentUserId: String
+    private let onGroupCreated: ((String) -> Void)?
 
-    init(usersViewModel: UsersViewModel, conversationService: ConversationService) {
+    init(
+        usersViewModel: UsersViewModel,
+        conversationService: ConversationService,
+        onGroupCreated: ((String) -> Void)? = nil
+    ) {
         _usersViewModel = StateObject(wrappedValue: usersViewModel)
         _conversationService = StateObject(wrappedValue: conversationService)
         self.currentUserId = FirebaseManager.shared.currentUserId ?? ""
+        self.onGroupCreated = onGroupCreated
     }
 
     var body: some View {
@@ -292,7 +298,7 @@ struct CreateGroupView: View {
 
     private var canCreateGroup: Bool {
         let trimmedName = groupName.trimmingCharacters(in: .whitespaces)
-        return !trimmedName.isEmpty && selectedUserIds.count >= 2 && !isCreating
+        return !trimmedName.isEmpty && selectedUserIds.count >= 1 && !isCreating
     }
 
     // MARK: - Actions
@@ -329,8 +335,10 @@ struct CreateGroupView: View {
 
             isCreating = false
 
-            // Dismiss and let user see the new group in the list
-            // This is safer than immediate navigation
+            // Call the callback before dismissing
+            onGroupCreated?(conversationId)
+
+            // Dismiss the sheet
             dismiss()
 
         } catch {

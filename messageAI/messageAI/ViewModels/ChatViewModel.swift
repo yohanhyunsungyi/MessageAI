@@ -30,8 +30,9 @@ class ChatViewModel: ObservableObject {
 
     private var conversationId: String
     private var cancellables = Set<AnyCancellable>()
-    private var typingDebounceTimer: Timer?
+    private var typingRefreshTimer: Timer?
     private var otherParticipantId: String?
+    private var isCurrentlyTyping = false
 
     // MARK: - Computed Properties
 
@@ -44,7 +45,7 @@ class ChatViewModel: ObservableObject {
     }
 
     var canSendMessage: Bool {
-        !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading
+        !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var navigationTitle: String {
@@ -128,10 +129,6 @@ class ChatViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$messages)
 
-        messageService.$isLoading
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$isLoading)
-
         messageService.$errorMessage
             .receive(on: DispatchQueue.main)
             .assign(to: &$errorMessage)
@@ -152,6 +149,9 @@ class ChatViewModel: ObservableObject {
     // MARK: - Lifecycle Methods
 
     func onAppear() async {
+        // Mark this conversation as active (suppresses notifications for it)
+        messageService.setActiveConversation(conversationId)
+
         await loadConversation()
         await loadMessages()
         startListening()
@@ -160,9 +160,12 @@ class ChatViewModel: ObservableObject {
     }
 
     func onDisappear() {
+        // Clear active conversation (allows notifications again)
+        messageService.setActiveConversation(nil)
+
         stopListening()
         stopPresenceListening()
-        stopTypingIfNeeded()
+        stopTyping()
     }
 
     // MARK: - Data Loading
@@ -240,7 +243,7 @@ class ChatViewModel: ObservableObject {
         messageText = ""
 
         // Stop typing indicator
-        stopTypingIfNeeded()
+        stopTyping()
 
         do {
             try await messageService.sendMessage(
@@ -282,21 +285,52 @@ class ChatViewModel: ObservableObject {
     // MARK: - Typing Indicators
 
     func onMessageTextChanged() {
-        // Start typing indicator
+        // Only show typing indicator if there's actually text
+        let hasText = !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        if hasText {
+            // Start typing if not already started
+            if !isCurrentlyTyping {
+                startTyping()
+            }
+            // Note: We don't use a debounce timer anymore
+            // The typing indicator stays active as long as there's text
+            // The refresh timer keeps it alive continuously
+        } else {
+            // Text is empty, stop typing immediately
+            stopTyping()
+        }
+    }
+
+    private func startTyping() {
+        guard !isCurrentlyTyping else { return }
+        isCurrentlyTyping = true
+
+        // Send initial typing indicator
         Task {
             try? await messageService.setTyping(conversationId: conversationId, isTyping: true)
         }
 
-        // Reset debounce timer
-        typingDebounceTimer?.invalidate()
-        typingDebounceTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
-            self?.stopTypingIfNeeded()
+        // Start refresh timer - send typing update every 3 seconds to keep it alive
+        typingRefreshTimer?.invalidate()
+        typingRefreshTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                // Only refresh if we still have text
+                let hasText = !self.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                if hasText && self.isCurrentlyTyping {
+                    try? await self.messageService.setTyping(conversationId: self.conversationId, isTyping: true)
+                }
+            }
         }
     }
 
-    private func stopTypingIfNeeded() {
-        typingDebounceTimer?.invalidate()
-        typingDebounceTimer = nil
+    private func stopTyping() {
+        guard isCurrentlyTyping else { return }
+        isCurrentlyTyping = false
+
+        typingRefreshTimer?.invalidate()
+        typingRefreshTimer = nil
 
         Task {
             try? await messageService.setTyping(conversationId: conversationId, isTyping: false)

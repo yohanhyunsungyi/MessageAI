@@ -103,6 +103,7 @@ struct UserRowView: View {
     VStack(spacing: UIStyleGuide.Spacing.md) {
         UserRowView(user: User(
             id: "1",
+            email: "john.doe@example.com",
             displayName: "John Doe",
             photoURL: nil,
             phoneNumber: nil,
@@ -114,6 +115,7 @@ struct UserRowView: View {
 
         UserRowView(user: User(
             id: "2",
+            email: "jane.smith@example.com",
             displayName: "Jane Smith",
             photoURL: nil,
             phoneNumber: nil,

@@ -30,7 +30,7 @@ struct ProfileView: View {
                         // Settings Section
                         settingsSection
 
-                        Spacer(minLength: UIStyleGuide.Spacing.xxl)
+                        Spacer(minLength: UIStyleGuide.Spacing.md)
 
                         // Sign Out Button
                         signOutButton
@@ -115,7 +115,7 @@ struct ProfileView: View {
             InfoRow(
                 icon: "envelope.fill",
                 title: "Email",
-                value: authService.currentUser?.phoneNumber ?? "Not set"
+                value: authService.currentUser?.email ?? "Not set"
             )
 
             Divider()
@@ -148,14 +148,29 @@ struct ProfileView: View {
 
             // Settings Card
             VStack(spacing: 0) {
-                SettingRow(
-                    icon: "bell.fill",
-                    title: "Notifications",
-                    subtitle: "Manage notification settings"
-                )
+                Button {
+                    openAppSettings()
+                } label: {
+                    SettingRow(
+                        icon: "bell.fill",
+                        title: "Notifications",
+                        subtitle: "Manage notification settings"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(UIStyleGuide.Spacing.md)
             .cardStyle()
+        }
+    }
+
+    // MARK: - Actions
+
+    private func openAppSettings() {
+        if let appSettings = URL(string: UIApplication.openSettingsURLString) {
+            if UIApplication.shared.canOpenURL(appSettings) {
+                UIApplication.shared.open(appSettings)
+            }
         }
     }
 

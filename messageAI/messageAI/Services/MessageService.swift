@@ -22,10 +22,18 @@ class MessageService: ObservableObject {
     private let localStorageService: LocalStorageService
     private var listener: ListenerRegistration?
     private var typingListener: ListenerRegistration?
+    private var typingExpiryTimer: Timer?
     private var offlineQueue: [Message] = []
     private var isOnline = true
     private var currentConversationId: String?
     private var notificationService: NotificationService?
+    private var lastTypingSnapshot: [String: Date] = [:]
+
+    // MARK: - Global Monitoring Properties
+    /// Dictionary of conversation listeners for background monitoring
+    private var conversationListeners: [String: ListenerRegistration] = [:]
+    /// Track which conversation is actively being viewed (to suppress notifications)
+    private var activeConversationId: String?
 
     // MARK: - Initialization
     init(localStorageService: LocalStorageService, notificationService: NotificationService? = nil) {
@@ -39,15 +47,16 @@ class MessageService: ObservableObject {
         self.notificationService = service
     }
 
-    nonisolated deinit {
-        // Capture listeners to avoid capturing self in Task
-        let messageListener = listener
-        let typingListenerRef = typingListener
+    deinit {
+        listener?.remove()
+        typingListener?.remove()
+        typingExpiryTimer?.invalidate()
 
-        Task { @MainActor in
-            messageListener?.remove()
-            typingListenerRef?.remove()
+        // Manually stop all conversation listeners
+        for (_, listener) in conversationListeners {
+            listener.remove()
         }
+        conversationListeners.removeAll()
     }
 
     // MARK: - Helper Properties
@@ -316,6 +325,151 @@ class MessageService: ObservableObject {
         currentConversationId = nil
     }
 
+    // MARK: - Global Conversation Monitoring
+
+    /// Start monitoring a conversation for new messages (for notifications)
+    /// This creates a background listener that doesn't update the messages array
+    func startMonitoring(conversationId: String) {
+        // Don't create duplicate listeners
+        guard conversationListeners[conversationId] == nil else {
+            print("🔔 Already monitoring conversation: \(conversationId)")
+            return
+        }
+
+        print("🔔 Starting background monitoring for: \(conversationId)")
+
+        let backgroundListener = firestore
+            .collection(Constants.Collections.conversations)
+            .document(conversationId)
+            .collection(Constants.Collections.messages)
+            .order(by: "timestamp", descending: false)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    print("❌ Background listener error for \(conversationId): \(error)")
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    return
+                }
+
+                Task { @MainActor in
+                    // Decode messages
+                    let fetchedMessages = documents.compactMap { doc -> Message? in
+                        let data = doc.data()
+
+                        guard let senderId = data["senderId"] as? String,
+                              let senderName = data["senderName"] as? String,
+                              let text = data["text"] as? String,
+                              let timestamp = (data["timestamp"] as? Timestamp)?.dateValue(),
+                              let statusRaw = data["status"] as? String,
+                              let status = MessageStatus(rawValue: statusRaw) else {
+                            return nil
+                        }
+
+                        let readBy = (data["readBy"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
+                        let deliveredTo = (data["deliveredTo"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
+
+                        return Message(
+                            id: doc.documentID,
+                            senderId: senderId,
+                            senderName: senderName,
+                            senderPhotoURL: data["senderPhotoURL"] as? String,
+                            text: text,
+                            timestamp: timestamp,
+                            status: status,
+                            readBy: readBy,
+                            deliveredTo: deliveredTo,
+                            localId: data["localId"] as? String
+                        )
+                    }
+
+                    // Check for new messages from other users
+                    await self.checkForNotifications(
+                        messages: fetchedMessages,
+                        conversationId: conversationId
+                    )
+                }
+            }
+
+        conversationListeners[conversationId] = backgroundListener
+        print("✅ Background monitoring started for: \(conversationId)")
+    }
+
+    /// Stop monitoring a specific conversation
+    func stopMonitoring(conversationId: String) {
+        conversationListeners[conversationId]?.remove()
+        conversationListeners.removeValue(forKey: conversationId)
+        print("🔕 Stopped monitoring conversation: \(conversationId)")
+    }
+
+    /// Stop monitoring all conversations
+    func stopAllMonitoring() {
+        for (conversationId, listener) in conversationListeners {
+            listener.remove()
+            print("🔕 Stopped monitoring: \(conversationId)")
+        }
+        conversationListeners.removeAll()
+    }
+
+    /// Set which conversation is currently being viewed (to suppress notifications)
+    func setActiveConversation(_ conversationId: String?) {
+        activeConversationId = conversationId
+        if let id = conversationId {
+            print("📱 Active conversation set to: \(id)")
+        } else {
+            print("📱 No active conversation")
+        }
+    }
+
+    /// Check for new messages and show notifications if needed
+    private var lastSeenMessageIds: [String: Set<String>] = [:]
+
+    private func checkForNotifications(messages: [Message], conversationId: String) async {
+        guard let notificationService = notificationService else {
+            return
+        }
+
+        // Initialize tracking for this conversation if needed
+        if lastSeenMessageIds[conversationId] == nil {
+            lastSeenMessageIds[conversationId] = Set(messages.map { $0.id })
+            return // Don't show notifications on initial load
+        }
+
+        let previousMessageIds = lastSeenMessageIds[conversationId] ?? Set()
+        let currentMessageIds = Set(messages.map { $0.id })
+
+        // Find new message IDs
+        let newMessageIds = currentMessageIds.subtracting(previousMessageIds)
+
+        // Get the actual new messages
+        let newMessages = messages.filter { message in
+            newMessageIds.contains(message.id) &&
+            message.senderId != currentUserId
+        }
+
+        // Update tracking
+        lastSeenMessageIds[conversationId] = currentMessageIds
+
+        // Only show notifications if this is NOT the active conversation
+        guard activeConversationId != conversationId else {
+            print("📱 Suppressing notification - user is viewing \(conversationId)")
+            return
+        }
+
+        // Show notifications for new messages
+        for message in newMessages {
+            print("🔔 Showing background notification for: \(message.senderName)")
+            await notificationService.showForegroundNotification(
+                from: message.senderName,
+                message: message.text,
+                conversationId: conversationId
+            )
+        }
+    }
+
     // MARK: - Message Merging
 
     private func mergeMessages(_ remoteMessages: [Message], conversationId: String) async {
@@ -495,17 +649,86 @@ class MessageService: ObservableObject {
                 guard let documents = snapshot?.documents else { return }
 
                 Task { @MainActor in
-                    let typingUserIds = documents
-                        .compactMap { $0.data()["userId"] as? String }
-                        .filter { $0 != self.currentUserId }
-                    self.typingUsers = typingUserIds
+                    await self.updateTypingIndicators(documents)
                 }
             }
+
+        // Start a timer to periodically clean up stale typing indicators
+        // This ensures indicators disappear even if Firestore doesn't send updates
+        typingExpiryTimer?.invalidate()
+        typingExpiryTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.cleanupStaleTypingIndicators()
+            }
+        }
+    }
+
+    private func updateTypingIndicators(_ documents: [QueryDocumentSnapshot]) async {
+        let now = Date()
+
+        // Get current user IDs from documents
+        let currentUserIds = Set(documents.compactMap { doc -> String? in
+            doc.data()["userId"] as? String
+        })
+
+        // Clear the snapshot and rebuild from current documents
+        lastTypingSnapshot.removeAll()
+
+        // Update the snapshot with fresh timestamps
+        for doc in documents {
+            if let userId = doc.data()["userId"] as? String,
+               let timestamp = doc.data()["timestamp"] as? Timestamp {
+                lastTypingSnapshot[userId] = timestamp.dateValue()
+            }
+        }
+
+        // Filter active typing users (not stale, not self)
+        let typingUserIds = lastTypingSnapshot.compactMap { (userId, timestamp) -> String? in
+            guard userId != self.currentUserId else { return nil }
+
+            let timeSinceUpdate = now.timeIntervalSince(timestamp)
+            if timeSinceUpdate > 5.0 {
+                return nil
+            }
+
+            return userId
+        }
+
+        self.typingUsers = typingUserIds
+
+        if !typingUserIds.isEmpty {
+            print("👀 Active typing users: \(typingUserIds)")
+        }
+    }
+
+    private func cleanupStaleTypingIndicators() async {
+        let now = Date()
+        var hasChanges = false
+
+        // Remove stale entries from snapshot
+        for (userId, timestamp) in lastTypingSnapshot {
+            let timeSinceUpdate = now.timeIntervalSince(timestamp)
+            if timeSinceUpdate > 5.0 {
+                lastTypingSnapshot.removeValue(forKey: userId)
+                hasChanges = true
+                print("⏱️ Removed stale typing indicator from \(userId)")
+            }
+        }
+
+        // Update UI if we removed any stale indicators
+        if hasChanges {
+            let activeUserIds = lastTypingSnapshot.keys.filter { $0 != self.currentUserId }
+            self.typingUsers = Array(activeUserIds)
+        }
     }
 
     func stopListeningForTyping() {
         typingListener?.remove()
         typingListener = nil
+        typingExpiryTimer?.invalidate()
+        typingExpiryTimer = nil
+        lastTypingSnapshot.removeAll()
+        typingUsers = []
     }
 
     // MARK: - Helper Methods

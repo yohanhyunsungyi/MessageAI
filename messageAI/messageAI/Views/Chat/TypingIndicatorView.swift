@@ -13,14 +13,20 @@ struct TypingIndicatorView: View {
     @State private var animationPhase = 0
 
     private var displayText: String {
-        if typingUserNames.isEmpty {
+        let count = typingUserNames.count
+
+        if count == 0 {
             return ""
-        } else if typingUserNames.count == 1 {
+        } else if count == 1 {
             return "\(typingUserNames[0]) is typing"
-        } else if typingUserNames.count == 2 {
+        } else if count == 2 {
             return "\(typingUserNames[0]) and \(typingUserNames[1]) are typing"
+        } else if count == 3 {
+            return "3 people are typing"
+        } else if count == 4 {
+            return "4 people are typing"
         } else {
-            return "\(typingUserNames[0]) and \(typingUserNames.count - 1) others are typing"
+            return "\(count) people are typing"
         }
     }
 

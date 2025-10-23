@@ -153,6 +153,7 @@ class UserService: ObservableObject {
         guard let data = document.data() else { return nil }
 
         let id = document.documentID
+        let email = data["email"] as? String ?? ""
         let displayName = data["displayName"] as? String ?? "Unknown"
         let photoURL = data["photoURL"] as? String
         let phoneNumber = data["phoneNumber"] as? String
@@ -180,6 +181,7 @@ class UserService: ObservableObject {
 
         return User(
             id: id,
+            email: email,
             displayName: displayName,
             photoURL: photoURL,
             phoneNumber: phoneNumber,

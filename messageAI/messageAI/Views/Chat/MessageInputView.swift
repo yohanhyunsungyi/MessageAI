@@ -46,10 +46,8 @@ struct MessageInputView: View {
                 .padding(.vertical, UIStyleGuide.Spacing.sm)
                 .background(UIStyleGuide.Colors.cardBackground)
                 .cornerRadius(UIStyleGuide.CornerRadius.large)
-                .onChange(of: text) { _, newValue in
-                    if !newValue.isEmpty {
-                        onTextChanged()
-                    }
+                .onChange(of: text) { _, _ in
+                    onTextChanged()
                 }
         }
     }

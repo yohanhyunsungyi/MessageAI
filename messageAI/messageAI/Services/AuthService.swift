@@ -259,6 +259,7 @@ class AuthService: ObservableObject {
         // Create user document
         let user = User(
             id: uid,
+            email: auth.currentUser?.email ?? "",
             displayName: displayName.trimmingCharacters(in: .whitespaces),
             photoURL: photoURL,
             phoneNumber: auth.currentUser?.phoneNumber,
