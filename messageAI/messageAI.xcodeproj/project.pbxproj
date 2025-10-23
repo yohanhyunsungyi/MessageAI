@@ -40,9 +40,22 @@
 		273A8C302EA71029007309EC /* messageAIUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = messageAIUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		278CC5702EAA831700FDA0F6 /* Exceptions for "messageAI" folder in "messageAI" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 273A8C162EA71028007309EC /* messageAI */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		273A8C192EA71028007309EC /* messageAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				278CC5702EAA831700FDA0F6 /* Exceptions for "messageAI" folder in "messageAI" target */,
+			);
 			path = messageAI;
 			sourceTree = "<group>";
 		};
@@ -426,11 +439,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = messageAI/messageAI.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3FX78D9U2N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = messageAI/Info.plist;
 				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.googleusercontent.apps.66323540487-kntg9rmvh4blv8613dh806cik7nac2gc\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.66323540487-kntg9rmvh4blv8613dh806cik7nac2gc\"\n    );\n}";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "google com.google com.google.chrome com.google.sso com.google.ios.youtube";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -456,11 +471,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = messageAI/messageAI.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3FX78D9U2N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = messageAI/Info.plist;
 				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.googleusercontent.apps.66323540487-kntg9rmvh4blv8613dh806cik7nac2gc\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.66323540487-kntg9rmvh4blv8613dh806cik7nac2gc\"\n    );\n}";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "google com.google com.google.chrome com.google.sso com.google.ios.youtube";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
