@@ -48,6 +48,39 @@ final class NotificationService: NSObject, ObservableObject {
     private func setupNotificationDelegate() {
         notificationCenter.delegate = self
         Messaging.messaging().delegate = self
+        setupNotificationCategories()
+    }
+
+    /// Setup notification categories and actions
+    private func setupNotificationCategories() {
+        // Define quick reply action
+        let replyAction = UNTextInputNotificationAction(
+            identifier: "REPLY_ACTION",
+            title: "Reply",
+            options: [],
+            textInputButtonTitle: "Send",
+            textInputPlaceholder: "Type a message..."
+        )
+
+        // Define mark as read action
+        let markReadAction = UNNotificationAction(
+            identifier: "MARK_READ_ACTION",
+            title: "Mark as Read",
+            options: []
+        )
+
+        // Create message category
+        let messageCategory = UNNotificationCategory(
+            identifier: "MESSAGE_CATEGORY",
+            actions: [replyAction, markReadAction],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+
+        // Register categories
+        notificationCenter.setNotificationCategories([messageCategory])
+
+        print("✅ Notification categories configured")
     }
 
     // MARK: - Permission Request
@@ -134,7 +167,8 @@ final class NotificationService: NSObject, ObservableObject {
     func showForegroundNotification(
         from senderName: String,
         message: String,
-        conversationId: String
+        conversationId: String,
+        senderImageURL: String? = nil
     ) async {
         let content = UNMutableNotificationContent()
         content.title = senderName
@@ -147,6 +181,15 @@ final class NotificationService: NSObject, ObservableObject {
             "conversationId": conversationId,
             "type": "new_message"
         ]
+
+        // Add notification category for message actions
+        content.categoryIdentifier = "MESSAGE_CATEGORY"
+
+        // Add sender image as attachment if available
+        if let imageURLString = senderImageURL,
+           let imageURL = URL(string: imageURLString) {
+            await addImageAttachment(to: content, from: imageURL)
+        }
 
         // Create trigger (immediate)
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
@@ -163,6 +206,35 @@ final class NotificationService: NSObject, ObservableObject {
             print("🔔 Foreground notification shown: \(senderName)")
         } catch {
             print("❌ Failed to show notification: \(error)")
+        }
+    }
+
+    /// Add image attachment to notification content
+    private func addImageAttachment(to content: UNMutableNotificationContent, from url: URL) async {
+        do {
+            // Download image data
+            let (data, _) = try await URLSession.shared.data(from: url)
+
+            // Save to temporary file
+            let temporaryDirectory = FileManager.default.temporaryDirectory
+            let fileName = "\(UUID().uuidString).png"
+            let fileURL = temporaryDirectory.appendingPathComponent(fileName)
+
+            try data.write(to: fileURL)
+
+            // Create attachment
+            let attachment = try UNNotificationAttachment(
+                identifier: "sender-image",
+                url: fileURL,
+                options: [UNNotificationAttachmentOptionsTypeHintKey: "public.png"]
+            )
+
+            content.attachments = [attachment]
+
+            print("✅ Added image attachment to notification")
+        } catch {
+            print("⚠️ Failed to add image attachment: \(error)")
+            // Continue without image - notification still works
         }
     }
 

@@ -83,17 +83,9 @@ struct ChatView: View {
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(viewModel?.navigationTitle ?? "")
-                        .font(UIStyleGuide.Typography.bodyBold)
-                        .foregroundColor(UIStyleGuide.Colors.textPrimary)
-
-                    if let subtitle = viewModel?.navigationSubtitle {
-                        Text(subtitle)
-                            .font(UIStyleGuide.Typography.caption)
-                            .foregroundColor(UIStyleGuide.Colors.textSecondary)
-                    }
-                }
+                Text(viewModel?.navigationTitle ?? "")
+                    .font(UIStyleGuide.Typography.bodyBold)
+                    .foregroundColor(UIStyleGuide.Colors.textPrimary)
             }
         }
         .task {

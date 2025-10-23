@@ -81,15 +81,19 @@ exports.sendMessageNotification = functions.firestore
             type: "new_message",
             senderId: message.senderId,
             senderName: message.senderName,
+            senderPhotoURL: message.senderPhotoURL || "",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
           },
           apns: {
             payload: {
-              aps: {
+              "aps": {
                 "badge": 1,
                 "sound": "default",
                 "content-available": 1,
+                "category": "MESSAGE_CATEGORY",
               },
+              // Add sender image URL for iOS notification attachment
+              "sender-image": message.senderPhotoURL || "",
             },
           },
         };

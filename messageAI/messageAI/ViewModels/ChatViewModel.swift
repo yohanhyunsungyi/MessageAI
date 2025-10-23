@@ -19,6 +19,7 @@ class ChatViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var typingUsers: [String] = []
     @Published var conversation: Conversation?
+    @Published var navigationTitle: String = "Chat"
 
     // MARK: - Private Properties
 
@@ -46,47 +47,6 @@ class ChatViewModel: ObservableObject {
 
     var canSendMessage: Bool {
         !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    var navigationTitle: String {
-        if let conversation = conversation {
-            if conversation.type == .group {
-                return conversation.groupName ?? "Group Chat"
-            } else {
-                // Get the other participant's name
-                let otherUserIds = conversation.participantIds.filter { $0 != currentUserId }
-                if let firstOtherId = otherUserIds.first,
-                   let otherName = conversation.participantNames[firstOtherId] {
-                    return otherName
-                }
-            }
-        }
-        return "Chat"
-    }
-
-    var navigationSubtitle: String? {
-        if let conversation = conversation, conversation.type == .oneOnOne {
-            // Show "typing..." first if someone is typing
-            if !typingUsers.isEmpty {
-                return "typing..."
-            }
-
-            // Show online status for 1-on-1 chats
-            if let otherUserId = otherParticipantId {
-                if presenceService.isUserOnline(otherUserId) {
-                    return "Online"
-                } else {
-                    // Show "Last seen..." if offline
-                    return "Offline"
-                }
-            }
-
-            return nil
-        } else if let conversation = conversation, conversation.type == .group {
-            let participantCount = conversation.participantIds.count
-            return "\(participantCount) members"
-        }
-        return nil
     }
 
     // MARK: - Initialization
@@ -180,10 +140,46 @@ class ChatViewModel: ObservableObject {
                 let otherUserIds = conversation.participantIds.filter { $0 != currentUserId }
                 otherParticipantId = otherUserIds.first
             }
+
+            // Update navigation title
+            updateNavigationTitle()
         } catch {
             print("Failed to load conversation: \(error)")
             // Don't set errorMessage here - conversation might still load from cache
             // and we want to allow the chat to work even if Firestore is temporarily unavailable
+        }
+    }
+
+    private func updateNavigationTitle() {
+        guard let conversation = conversation else {
+            print("❌ No conversation data - title: Chat")
+            navigationTitle = "Chat"
+            return
+        }
+
+        print("📋 Conversation data:")
+        print("   Type: \(conversation.type)")
+        print("   Participant IDs: \(conversation.participantIds)")
+        print("   Participant Names: \(conversation.participantNames)")
+        print("   Current User ID: \(currentUserId)")
+
+        // Update title
+        if conversation.type == .group {
+            navigationTitle = conversation.groupName ?? "Group Chat"
+            print("✅ Group chat title: \(navigationTitle)")
+        } else {
+            // Get the other participant's name
+            let otherUserIds = conversation.participantIds.filter { $0 != currentUserId }
+            print("   Other user IDs: \(otherUserIds)")
+
+            if let firstOtherId = otherUserIds.first,
+               let otherName = conversation.participantNames[firstOtherId] {
+                navigationTitle = otherName
+                print("✅ 1-on-1 chat title: \(navigationTitle)")
+            } else {
+                navigationTitle = "Chat"
+                print("⚠️ Could not find other participant name - defaulting to 'Chat'")
+            }
         }
     }
 

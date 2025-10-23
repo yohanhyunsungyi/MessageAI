@@ -465,7 +465,8 @@ class MessageService: ObservableObject {
             await notificationService.showForegroundNotification(
                 from: message.senderName,
                 message: message.text,
-                conversationId: conversationId
+                conversationId: conversationId,
+                senderImageURL: message.senderPhotoURL
             )
         }
     }
@@ -527,7 +528,8 @@ class MessageService: ObservableObject {
             await notificationService.showForegroundNotification(
                 from: message.senderName,
                 message: message.text,
-                conversationId: conversationId
+                conversationId: conversationId,
+                senderImageURL: message.senderPhotoURL
             )
         }
     }
