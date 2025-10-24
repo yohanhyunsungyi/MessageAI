@@ -1,6 +1,6 @@
 /**
  * Firebase Cloud Functions for MessageAI
- * Handles push notifications for new messages
+ * Handles push notifications and AI features
  */
 
 const functions = require("firebase-functions");
@@ -8,6 +8,10 @@ const admin = require("firebase-admin");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
+
+// Import AI infrastructure (for future use)
+// const {openai} = require("./src/ai/openai");
+// const {pinecone} = require("./src/ai/pinecone");
 
 /**
  * Send push notification when a new message is created
@@ -214,4 +218,29 @@ exports.updateConversationMetadata = functions.firestore
 
       return null;
     });
+
+/**
+ * Test AI Infrastructure
+ * Simple callable function to test Cloud Functions and AI setup
+ * Call from iOS: functions.httpsCallable("testAI").call()
+ */
+exports.testAI = functions.https.onCall(async (data, context) => {
+  // Verify authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Must be authenticated to test AI features",
+    );
+  }
+
+  console.log("🧪 Testing AI infrastructure");
+  console.log(`   User ID: ${context.auth.uid}`);
+
+  return {
+    success: true,
+    message: "AI infrastructure is ready!",
+    timestamp: Date.now(),
+    userId: context.auth.uid,
+  };
+});
 
