@@ -49,10 +49,18 @@ async function extractActionItems(conversationId, userId, messageLimit = 200) {
         .get();
 
     if (messagesSnap.empty) {
+      // participantNames is an object {userId: name}, convert to array of names
+      const participantNamesArray = conversation.participantNames ?
+          Object.values(conversation.participantNames) :
+          [];
+      const conversationName = participantNamesArray.length > 0 ?
+          participantNamesArray.join(", ") :
+          "Conversation";
+
       return {
         actionItems: [],
         conversationId,
-        conversationName: conversation.participantNames ? conversation.participantNames.join(", ") : "Conversation",
+        conversationName,
         messageCount: 0,
         extractedAt: admin.firestore.Timestamp.now(),
       };
@@ -103,10 +111,19 @@ async function extractActionItems(conversationId, userId, messageLimit = 200) {
 
     if (!functionCall || !functionCall.arguments) {
       console.log(`   No action items found`);
+
+      // participantNames is an object {userId: name}, convert to array of names
+      const participantNamesArray = conversation.participantNames ?
+          Object.values(conversation.participantNames) :
+          [];
+      const conversationName = participantNamesArray.length > 0 ?
+          participantNamesArray.join(", ") :
+          "Conversation";
+
       return {
         actionItems: [],
         conversationId,
-        conversationName: conversation.participantNames ? conversation.participantNames.join(", ") : "Conversation",
+        conversationName,
         messageCount: messages.length,
         extractedAt: admin.firestore.Timestamp.now(),
       };
@@ -116,6 +133,14 @@ async function extractActionItems(conversationId, userId, messageLimit = 200) {
     const actionItems = extracted.actionItems || [];
 
     console.log(`   Extracted ${actionItems.length} action items`);
+
+    // participantNames is an object {userId: name}, convert to array of names
+    const participantNamesArray = conversation.participantNames ?
+        Object.values(conversation.participantNames) :
+        [];
+    const conversationName = participantNamesArray.length > 0 ?
+        participantNamesArray.join(", ") :
+        "Conversation";
 
     // Store action items in Firestore
     const batch = admin.firestore().batch();
@@ -130,7 +155,7 @@ async function extractActionItems(conversationId, userId, messageLimit = 200) {
         deadline: item.deadline || "none",
         priority: item.priority || "medium",
         conversationId,
-        conversationName: conversation.participantNames ? conversation.participantNames.join(", ") : "Conversation",
+        conversationName,
         extractedAt: admin.firestore.Timestamp.now(),
         extractedBy: "ai",
         status: "pending",
@@ -149,7 +174,7 @@ async function extractActionItems(conversationId, userId, messageLimit = 200) {
     return {
       actionItems: storedActionItems,
       conversationId,
-      conversationName: conversation.participantNames ? conversation.participantNames.join(", ") : "Conversation",
+      conversationName,
       messageCount: messages.length,
       extractedAt: admin.firestore.Timestamp.now(),
       duration,
