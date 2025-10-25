@@ -17,6 +17,9 @@ struct ChatView: View {
     @State private var showSummary = false
     @State private var currentSummary: Summary?
     @State private var isSummarizing = false
+    @State private var isExtractingActions = false
+    @State private var showActionItemsAlert = false
+    @State private var extractedItemsCount = 0
 
     let conversationId: String
     let localStorageService: LocalStorageService?
@@ -93,24 +96,47 @@ struct ChatView: View {
             }
 
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    Task {
-                        await summarizeConversation()
+                HStack(spacing: 8) {
+                    // Extract Actions button
+                    Button {
+                        Task {
+                            await extractActionItems()
+                        }
+                    } label: {
+                        if isExtractingActions {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.8)
+                                .tint(Color.black)
+                        } else {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundColor(Color.black)
+                                .font(.system(size: 16, weight: .semibold))
+                        }
                     }
-                } label: {
-                    if isSummarizing {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .scaleEffect(0.8)
-                            .tint(Color.black)
-                    } else {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(Color.black)
-                            .font(.system(size: 16, weight: .semibold))
+                    .padding(8)
+                    .disabled(isExtractingActions || (viewModel?.messages.isEmpty ?? true))
+
+                    // Summarize button
+                    Button {
+                        Task {
+                            await summarizeConversation()
+                        }
+                    } label: {
+                        if isSummarizing {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.8)
+                                .tint(Color.black)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(Color.black)
+                                .font(.system(size: 16, weight: .semibold))
+                        }
                     }
+                    .padding(8)
+                    .disabled(isSummarizing || (viewModel?.messages.isEmpty ?? true))
                 }
-                .padding(8)
-                .disabled(isSummarizing || (viewModel?.messages.isEmpty ?? true))
             }
         }
         .task {
@@ -139,6 +165,11 @@ struct ChatView: View {
                 SummaryView(summary: summary)
             }
         }
+        .alert("Action Items Extracted", isPresented: $showActionItemsAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Successfully extracted \(extractedItemsCount) action item\(extractedItemsCount == 1 ? "" : "s"). Check the Action Items tab to view them.")
+        }
     }
 
     // MARK: - AI Features
@@ -161,6 +192,26 @@ struct ChatView: View {
         }
 
         isSummarizing = false
+    }
+
+    private func extractActionItems() async {
+        isExtractingActions = true
+
+        do {
+            print("📋 [ChatView] Extracting action items for conversation: \(conversationId)")
+            let actionItems = try await aiService.extractActionItems(conversationId: conversationId)
+            extractedItemsCount = actionItems.count
+            showActionItemsAlert = true
+            print("✅ [ChatView] Extracted \(actionItems.count) action items")
+        } catch {
+            print("❌ [ChatView] Failed to extract action items: \(error.localizedDescription)")
+            // Show error to user
+            if let viewModel = viewModel {
+                viewModel.errorMessage = "Failed to extract action items. Please try again."
+            }
+        }
+
+        isExtractingActions = false
     }
 
     private func setupViewModel() {

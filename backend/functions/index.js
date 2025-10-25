@@ -13,6 +13,7 @@ admin.initializeApp();
 const { indexMessageInPinecone } = require("./src/triggers/onMessageCreate");
 const { searchMessages } = require("./src/features/vectorSearch");
 const { summarizeConversation } = require("./src/features/summarization");
+const { extractActionItems } = require("./src/features/actionItems");
 const { withRateLimit } = require("./src/middleware/rateLimit");
 
 /**
@@ -330,5 +331,53 @@ exports.summarizeConversation = functions.https.onCall(
         );
       }
     }, "summarization"),
+);
+
+/**
+ * Action Item Extraction
+ * Extract structured action items from conversation threads
+ * Call from iOS: functions.httpsCallable("extractActionItems").call({ conversationId: "...", messageLimit: 200 })
+ */
+exports.extractActionItems = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to extract action items",
+        );
+      }
+
+      const { conversationId, messageLimit } = data;
+
+      if (!conversationId || typeof conversationId !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "conversationId is required and must be a string",
+        );
+      }
+
+      console.log(`📋 Action item extraction request from user: ${context.auth.uid}`);
+      console.log(`   Conversation: ${conversationId}`);
+
+      try {
+        const result = await extractActionItems(
+            conversationId,
+            context.auth.uid,
+            messageLimit || 200,
+        );
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ Action item extraction error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to extract action items",
+        );
+      }
+    }, "action-items"),
 );
 

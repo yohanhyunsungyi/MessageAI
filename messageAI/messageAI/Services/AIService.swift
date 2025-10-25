@@ -179,10 +179,102 @@ class AIService: ObservableObject {
 
     /// Extract action items from a conversation
     /// - Parameter conversationId: ID of the conversation
+    /// - Parameter messageLimit: Maximum messages to include (default: 200)
     /// - Returns: Array of action items
-    func extractActionItems(conversationId: String) async throws -> [String] {
-        // TODO: Implement in PR #25
-        throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not yet implemented"])
+    func extractActionItems(conversationId: String, messageLimit: Int = 200) async throws -> [ActionItem] {
+        // Check authentication first
+        guard auth.currentUser != nil else {
+            let error = NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "You must be signed in to use AI features"])
+            print("❌ [AIService] User not authenticated")
+            throw error
+        }
+
+        guard checkRateLimit() else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Rate limit exceeded"])
+        }
+
+        guard !conversationId.isEmpty else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Conversation ID cannot be empty"])
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            let userId = auth.currentUser?.uid ?? "unknown"
+            print("📋 [AIService] User authenticated: \(userId)")
+
+            // Get fresh ID token to ensure it's valid
+            if let user = auth.currentUser {
+                do {
+                    let token = try await user.getIDToken()
+                    print("📋 [AIService] Got ID token (length: \(token.count))")
+                } catch {
+                    print("⚠️ [AIService] Failed to get ID token: \(error)")
+                }
+            }
+
+            print("📋 [AIService] Extracting action items for conversation: \(conversationId)")
+
+            let params: [String: Any] = [
+                "conversationId": conversationId,
+                "messageLimit": messageLimit
+            ]
+
+            let result = try await functions.httpsCallable("extractActionItems").call(params)
+
+            guard let data = result.data as? [String: Any] else {
+                throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response format"])
+            }
+
+            // Parse the response
+            guard let actionItemsData = data["actionItems"] as? [[String: Any]] else {
+                throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid action items format"])
+            }
+
+            // Convert to ActionItem models
+            let actionItems = actionItemsData.compactMap { itemData -> ActionItem? in
+                guard let id = itemData["id"] as? String,
+                      let description = itemData["description"] as? String,
+                      let assignee = itemData["assignee"] as? String,
+                      let deadline = itemData["deadline"] as? String,
+                      let priorityStr = itemData["priority"] as? String,
+                      let priority = ActionItem.Priority(rawValue: priorityStr),
+                      let conversationId = itemData["conversationId"] as? String,
+                      let conversationName = itemData["conversationName"] as? String,
+                      let extractedBy = itemData["extractedBy"] as? String,
+                      let statusStr = itemData["status"] as? String,
+                      let status = ActionItem.Status(rawValue: statusStr) else {
+                    return nil
+                }
+
+                return ActionItem(
+                    id: id,
+                    description: description,
+                    assignee: assignee,
+                    deadline: deadline,
+                    priority: priority,
+                    conversationId: conversationId,
+                    conversationName: conversationName,
+                    extractedAt: Date(),
+                    extractedBy: extractedBy,
+                    status: status
+                )
+            }
+
+            print("✅ [AIService] Extracted \(actionItems.count) action items")
+            return actionItems
+
+        } catch {
+            let errorMsg = handleError(error)
+            errorMessage = errorMsg
+            print("❌ [AIService] Action item extraction failed: \(errorMsg)")
+            throw error
+        }
     }
 
     /// Smart search across all messages using semantic similarity

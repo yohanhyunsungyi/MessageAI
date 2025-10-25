@@ -43,17 +43,29 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
+            // Action Items Tab
+            ActionItemsListView()
+                .tabItem {
+                    VStack {
+                        Image(systemName: selectedTab == 2 ? "checkmark.circle.fill" : "checkmark.circle")
+                            .font(.system(size: UIStyleGuide.IconSize.medium))
+                        Text("Tasks")
+                            .font(UIStyleGuide.Typography.caption)
+                    }
+                }
+                .tag(2)
+
             // Profile Tab
             ProfileView()
                 .tabItem {
                     VStack {
-                        Image(systemName: selectedTab == 2 ? "person.circle.fill" : "person.circle")
+                        Image(systemName: selectedTab == 3 ? "person.circle.fill" : "person.circle")
                             .font(.system(size: UIStyleGuide.IconSize.medium))
                         Text("Profile")
                             .font(UIStyleGuide.Typography.caption)
                     }
                 }
-                .tag(2)
+                .tag(3)
         }
         .accentColor(UIStyleGuide.Colors.tabBarSelected)
         .task {
