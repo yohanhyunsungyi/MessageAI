@@ -253,7 +253,7 @@ struct ConversationsListView: View {
                         unreadCount: 0 // TODO: Calculate actual unread count from MessageService
                     )
                 }
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             }
