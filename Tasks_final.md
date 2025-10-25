@@ -51,121 +51,200 @@
 
 ---
 
-## PR #23: RAG Pipeline Implementation
-**Priority:** Critical  
-**Estimated Time:** 3-4 hours  
+## PR #23: RAG Pipeline Implementation ✅ COMPLETE
+**Priority:** Critical
+**Estimated Time:** 3-4 hours
 **Branch:** `feature/rag-pipeline`
+**Status:** ✅ Deployed and Tested
 
 ### Subtasks:
 
-- [ ] Implement message indexing (background)
-  - **Files Created:** `functions/src/triggers/onMessageCreate.ts`
-  - Firestore trigger on new messages
-  - Generate embedding for message
-  - Store in Pinecone with metadata
-  
-- [ ] Create embedding generation service
-  - **Files Edited:** `functions/src/ai/embeddings.ts`
-  - Function to generate text embeddings
-  - Batch processing support
-  - Error handling
-  
-- [ ] Implement vector search function
-  - **Files Created:** `functions/src/features/vectorSearch.ts`
-  - Query → embedding → Pinecone search
-  - Return top K results with scores
-  
-- [ ] Add conversation context retrieval
-  - **Files Created:** `functions/src/utils/contextRetrieval.ts`
-  - Given messageId, fetch surrounding context
-  - Format for LLM input
-  
-- [ ] Create batch indexing script
-  - **Files Created:** `functions/src/scripts/backfillEmbeddings.ts`
-  - Index existing messages (one-time migration)
-  - Progress tracking
-  
-- [ ] Add iOS interface for search
-  - **Files Edited:** `Services/AIService.swift`
-  - `searchMessages(query: String) async throws -> [Message]`
+- [x] Implement message indexing (background)
+  - **Files Created:** `backend/functions/src/triggers/onMessageCreate.js` ✅
+  - Firestore trigger on new messages ✅
+  - Generate embedding for message ✅
+  - Store in Pinecone with metadata ✅
+  - Integrated in index.js via onMessageWritten trigger ✅
+
+- [x] Create embedding generation service
+  - **Files Created:** `backend/functions/src/ai/embeddings.js` ✅
+  - Function to generate text embeddings ✅
+  - Batch processing support ✅
+  - Error handling ✅
+  - Uses OpenAI text-embedding-3-small model ✅
+
+- [x] Implement vector search function
+  - **Files Created:** `backend/functions/src/features/vectorSearch.js` ✅
+  - Query → embedding → Pinecone search ✅
+  - Return top K results with scores ✅
+  - Conversation filtering support ✅
+  - Exported as callable function `smartSearch` ✅
+
+- [x] Add conversation context retrieval
+  - **Implementation:** Integrated in vectorSearch.js ✅
+  - Given messageId, fetch from Pinecone metadata ✅
+  - Format for LLM input ✅
+
+- [x] Create batch indexing script
+  - **Files Created:** `backend/functions/src/scripts/backfillEmbeddings.js` ✅
+  - Index existing messages (one-time migration) ✅
+  - Progress tracking ✅
+  - Batch processing with rate limiting ✅
+
+- [x] Add iOS interface for search
+  - **Files Edited:** `messageAI/messageAI/Services/AIService.swift` ✅
+  - `smartSearch(query: String, topK: Int, conversationId: String?) async throws -> [[String: Any]]` ✅
+  - Full error handling and rate limiting ✅
 
 ### Testing:
-- [ ] Test embedding generation
-  - **Files Created:** `functions/src/__tests__/embeddings.test.ts`
-  - Test with sample messages
-  - Verify embedding dimensions
-  
-- [ ] Test vector search accuracy
-  - **Files Created:** `functions/src/__tests__/vectorSearch.test.ts`
-  - Create test dataset (20 messages)
-  - Run queries, verify relevance
-  - Measure recall@5
+- [x] Test embedding generation
+  - **Files Created:** `backend/functions/src/__tests__/embeddings.test.js` ✅
+  - Test with sample messages ✅
+  - Verify embedding dimensions (1536) ✅
+  - Test batch processing ✅
+
+- [x] Test vector search accuracy
+  - **Files Created:** `backend/functions/src/__tests__/vectorSearch.test.js` ✅
+  - Create test dataset (20 messages) ✅
+  - Run queries, verify relevance ✅
+  - Measure recall@5 ✅
 
 ### Files Summary:
-- **Created:** RAG pipeline files, indexing triggers, search functions
-- **Edited:** `Services/AIService.swift`
-- **Tests Created:** Embedding and vector search tests
+- **Created:**
+  - `backend/functions/src/triggers/onMessageCreate.js` - Background indexing
+  - `backend/functions/src/features/vectorSearch.js` - Smart search function
+  - `backend/functions/src/scripts/backfillEmbeddings.js` - Migration script
+  - `backend/functions/src/__tests__/embeddings.test.js` - Embedding tests
+  - `backend/functions/src/__tests__/vectorSearch.test.js` - Search tests
+- **Edited:**
+  - `backend/functions/src/ai/embeddings.js` - Enhanced with batch support
+  - `messageAI/messageAI/Services/AIService.swift` - Added smartSearch method
+  - `backend/functions/index.js` - Exported smartSearch and onMessageWritten trigger
+
+### Deployment:
+✅ Cloud Functions deployed to Firebase (us-central1)
+✅ smartSearch function live and callable
+✅ onMessageWritten trigger active for automatic indexing
+✅ All tests passing
 
 ---
 
-## PR #24: AI Feature 1 - Thread Summarization
-**Priority:** High  
-**Estimated Time:** 3 hours  
-**Branch:** `feature/summarization`
+## PR #24: AI Feature 1 - Thread Summarization ✅ COMPLETE
+**Priority:** High
+**Estimated Time:** 3 hours
+**Actual Time:** 3 hours
+**Branch:** `feature/thread-summarization`
+**Status:** ✅ Deployed and Tested
 
 ### Subtasks:
 
-- [ ] Create summarization Cloud Function
-  - **Files Created:** `functions/src/features/summarization.ts`
-  - Callable function: `summarizeConversation`
-  - Fetch messages from Firestore
-  - Call OpenAI with prompt
-  - Return structured summary
-  
-- [ ] Design summarization prompt
-  - **Files Edited:** `functions/src/ai/prompts.ts`
-  - Add SUMMARIZATION_PROMPT constant
-  - Optimize for team conversations
-  
-- [ ] Create Summary data model
-  - **Files Created:** `Models/Summary.swift`
-  - Summary structure (bullets, participants, timerange)
-  
-- [ ] Add UI for summarization
-  - **Files Created:** `Views/Chat/SummaryView.swift`
-  - Display summary card
-  - Show key points as bullets
-  - "View Full Thread" button
-  
-- [ ] Add "Summarize" button to ChatView
-  - **Files Edited:** `Views/Chat/ChatView.swift`
-  - Button in navigation bar
-  - Tap → call AIService.summarize()
-  - Show loading state
-  
-- [ ] Implement AIService method
-  - **Files Edited:** `Services/AIService.swift`
-  - `summarizeConversation(conversationId: String) async throws -> Summary`
-  - Call Cloud Function
-  - Parse response
+- [x] Create summarization Cloud Function
+  - **Files Created:** `backend/functions/src/features/summarization.js` ✅
+  - Callable function: `summarizeConversation` ✅
+  - Fetch messages from Firestore ✅
+  - Call OpenAI GPT-4 Turbo with prompt ✅
+  - Return structured summary ✅
+  - Verify user is conversation participant ✅
+
+- [x] Design summarization prompt
+  - **Files Created:** `backend/functions/src/ai/prompts.js` ✅
+  - Add SUMMARIZATION_PROMPT constant ✅
+  - Focus on key points, decisions, action items ✅
+
+- [x] Create Summary data model
+  - **Files Created:** `messageAI/messageAI/Models/Summary.swift` ✅
+  - id, conversationId, summary, keyPoints ✅
+  - messageCount, timeRange, participants ✅
+  - Codable conformance ✅
+
+- [x] Add UI for summarization
+  - **Files Created:** `messageAI/messageAI/Views/Chat/SummaryView.swift` ✅
+  - Display summary card ✅
+  - Show key points as bullets ✅
+  - Beautiful sheet design with scroll ✅
+
+- [x] Add sparkles button to ChatView
+  - **Files Edited:** `messageAI/messageAI/Views/Chat/ChatView.swift` ✅
+  - Sparkles icon in navigation bar ✅
+  - Tap → call AIService.summarizeConversation() ✅
+  - Show loading state with progress indicator ✅
+  - Disable when no messages ✅
+
+- [x] Implement AIService method
+  - **Files Edited:** `messageAI/messageAI/Services/AIService.swift` ✅
+  - `summarizeConversation(conversationId: String) async throws -> Summary` ✅
+  - Call Cloud Function ✅
+  - Parse response into Summary model ✅
+  - Handle authentication ✅
+  - Error handling with user-friendly messages ✅
+
+- [x] Export function in index.js
+  - **Files Edited:** `backend/functions/index.js` ✅
+  - Wrapped with rate limiting middleware ✅
+  - Authentication check ✅
+  - Input validation ✅
+
+- [x] Set IAM permissions for Cloud Functions v2
+  - **Critical Fix:** Firebase Functions v5 requires explicit IAM permissions ✅
+  - Installed Google Cloud SDK ✅
+  - Created `set-iam-permissions.sh` script ✅
+  - Set Cloud Functions Invoker role for allUsers ✅
+  - Applied to: testAI, smartSearch, summarizeConversation ✅
+
+- [x] Deploy functions
+  - **Commands:** `npm run deploy` ✅
+  - All functions deployed successfully ✅
+  - IAM permissions configured ✅
 
 ### Testing:
-- [ ] Test summarization with sample conversations
-  - **Files Created:** `functions/src/__tests__/summarization.test.ts`
-  - 10 test conversations (50-200 messages each)
-  - Verify summary quality
-  - Check response time (<3s)
-  
-- [ ] Create UI tests
-  - **Files Created:** `MessageAIUITests/SummarizationUITests.swift`
-  - Test tap Summarize button
-  - Test summary display
-  - Test loading states
+- [x] Test summarization with sample conversations
+  - **Files Created:** `backend/functions/src/__tests__/summarization.test.js` ✅
+  - Test conversation validation ✅
+  - Test user authorization ✅
+  - Test summary quality expectations ✅
+  - Test performance requirements (<3s) ✅
+  - Test edge cases (1 message, long messages, special chars) ✅
+  - Test response format ✅
+
+- [ ] Create UI tests (Deferred)
+  - Can add in future PR if needed
+
+### Critical Issues Resolved:
+1. **UNAUTHENTICATED Error**
+   - Root Cause: Firebase Functions v5 (2nd gen) requires explicit IAM permissions
+   - Solution: Set `roles/cloudfunctions.invoker` for `allUsers` via gcloud CLI
+   - Impact: All callable functions now properly authenticate client requests
+
+2. **Missing OpenAI API Key in Production**
+   - Root Cause: API key not configured in Firebase Functions config
+   - Solution: Set via `firebase functions:config:set openai.api_key="..."`
+   - Impact: Functions can now call OpenAI API successfully
+
+3. **Firebase Functions Region Mismatch**
+   - Root Cause: Initially tried specifying us-central1 region in iOS client
+   - Solution: Use default `Functions.functions()` for automatic region detection
+   - Impact: Auth context now properly passed to callable functions
 
 ### Files Summary:
-- **Created:** `functions/src/features/summarization.ts`, `Models/Summary.swift`, `Views/Chat/SummaryView.swift`
-- **Edited:** `Views/Chat/ChatView.swift`, `Services/AIService.swift`, `functions/src/ai/prompts.ts`
-- **Tests Created:** Summarization function tests, UI tests
+- **Created:**
+  - `backend/functions/src/features/summarization.js` (170 lines) ✅
+  - `backend/functions/src/ai/prompts.js` (50 lines) ✅
+  - `backend/functions/src/__tests__/summarization.test.js` (206 lines) ✅
+  - `messageAI/messageAI/Models/Summary.swift` (35 lines) ✅
+  - `messageAI/messageAI/Views/Chat/SummaryView.swift` (150 lines) ✅
+  - `backend/functions/set-iam-permissions.sh` (deployment script) ✅
+- **Edited:**
+  - `backend/functions/index.js` (added summarizeConversation export) ✅
+  - `messageAI/messageAI/Services/AIService.swift` (implemented method) ✅
+  - `messageAI/messageAI/Views/Chat/ChatView.swift` (added sparkles button) ✅
+  - `backend/functions/.eslintrc.js` (added Jest environment) ✅
+  - `backend/functions/src/ai/openai.js` (conditional initialization) ✅
+
+### Deployment Notes:
+- **IAM Setup Required:** Run `./set-iam-permissions.sh` after deploying functions
+- **API Key Required:** Configure OpenAI key via `firebase functions:config:set`
+- **Test in Production:** Verify authentication works after IAM setup
+- **Monitor Usage:** OpenAI API calls consume tokens (cost monitoring recommended)
 
 ---
 
@@ -970,12 +1049,12 @@
 
 ## Quick Reference Checklist
 
-### Phase 1: AI Infrastructure (PRs 22-23) - Day 1
-- [ ] PR #22: AI Infrastructure Setup
-- [ ] PR #23: RAG Pipeline Implementation
+### Phase 1: AI Infrastructure (PRs 22-23) - Day 1 ✅ COMPLETE
+- [x] PR #22: AI Infrastructure Setup
+- [x] PR #23: RAG Pipeline Implementation
 
 ### Phase 2: Core AI Features (PRs 24-28) - Days 2-3
-- [ ] PR #24: Thread Summarization
+- [x] PR #24: Thread Summarization
 - [ ] PR #25: Action Item Extraction
 - [ ] PR #26: Smart Search
 - [ ] PR #27: Priority Message Detection

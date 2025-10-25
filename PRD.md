@@ -1,1160 +1,976 @@
-# MessageAI MVP - Product Requirements Document
+# MessageAI Final - Product Requirements Document (AI Features)
 
-## Project Overview
-
-**Project Name:** MessageAI MVP  
-**Platform:** iOS (Swift + SwiftUI)  
-**Backend:** Firebase (Firestore, Auth, Cloud Functions, FCM)  
-**Timeline:** 24 hours  
-**Objective:** Build a production-quality messaging infrastructure with real-time sync, offline support, and reliable message delivery.
+**Project Name:** MessageAI Final (Post-MVP)  
+**Target Persona:** Remote Team Professional  
+**Timeline:** 4-5 days (after MVP completion)  
+**Objective:** Build production-quality AI features that solve real pain points for distributed software teams
 
 ---
 
-## 1. Technical Architecture
+## Executive Summary
 
-### 1.1 System Components
+Building on the completed MVP messaging infrastructure, this PRD defines the AI-powered features that transform MessageAI into an intelligent collaboration tool for remote software teams. The focus is on reducing cognitive load, surfacing critical information, and automating routine scheduling tasks.
 
-```
-┌─────────────────┐
-│   iOS App       │
-│   (SwiftUI)     │
-├─────────────────┤
-│ • UI Layer      │
-│ • ViewModels    │
-│ • Local Storage │
-│ • Firebase SDK  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Firebase      │
-├─────────────────┤
-│ • Firestore     │
-│ • Auth          │
-│ • FCM           │
-│ • Functions     │
-└─────────────────┘
-```
-
-### 1.2 Tech Stack
-
-**Frontend (iOS)**
-- Swift 5.9+
-- SwiftUI for UI
-- SwiftData for local persistence
-- Combine for reactive programming
-- Firebase iOS SDK
-
-**Backend (Firebase)**
-- Firestore: Real-time database
-- Firebase Auth: User authentication
-- Cloud Functions: Server-side logic
-- FCM: Push notifications
+**Target Grade:** A (90-100 points)
 
 ---
 
-## 2. Data Models
+## 1. Persona Deep Dive: Remote Team Professional
 
-### 2.1 Firestore Collections
+### Who They Are
+- Software Engineers, Designers, Product Managers
+- Work in distributed teams across multiple time zones
+- Handle 50-200+ messages daily across multiple channels
+- Participate in 3-5 ongoing projects simultaneously
+- Mix of synchronous (video calls) and asynchronous (chat) communication
 
-#### **Users Collection** (`/users/{userId}`)
-```swift
-struct User: Codable, Identifiable {
-    let id: String              // Firebase Auth UID
-    var displayName: String
-    var photoURL: String?
-    var phoneNumber: String?
-    var isOnline: Bool
-    var lastSeen: Date
-    var fcmToken: String?
-    var createdAt: Date
-}
-```
+### Core Pain Points (from rubric)
+1. **Drowning in threads** - Can't keep track of multiple conversation threads across projects
+2. **Missing important messages** - Critical info gets buried in high-volume channels
+3. **Context switching** - Mental overhead of switching between projects/conversations
+4. **Time zone coordination** - Scheduling meetings across PST, EST, GMT, IST is painful
+5. **Decision tracking** - Hard to remember what was decided and when
 
-#### **Conversations Collection** (`/conversations/{conversationId}`)
-```swift
-struct Conversation: Codable, Identifiable {
-    let id: String
-    var participantIds: [String]        // User IDs
-    var participantNames: [String: String] // userId: displayName
-    var participantPhotos: [String: String?] // userId: photoURL
-    var lastMessage: String?
-    var lastMessageTimestamp: Date?
-    var lastMessageSenderId: String?
-    var type: ConversationType          // .oneOnOne or .group
-    var groupName: String?              // Only for groups
-    var createdAt: Date
-    var createdBy: String
-}
-
-enum ConversationType: String, Codable {
-    case oneOnOne
-    case group
-}
-```
-
-#### **Messages Subcollection** (`/conversations/{conversationId}/messages/{messageId}`)
-```swift
-struct Message: Codable, Identifiable {
-    let id: String
-    let senderId: String
-    let senderName: String
-    let senderPhotoURL: String?
-    var text: String
-    var timestamp: Date
-    var status: MessageStatus
-    var readBy: [String: Date]          // userId: readTimestamp
-    var deliveredTo: [String: Date]     // userId: deliveredTimestamp
-    var localId: String?                // For optimistic updates
-}
-
-enum MessageStatus: String, Codable {
-    case sending
-    case sent
-    case delivered
-    case read
-    case failed
-}
-```
-
-### 2.2 Local Storage (SwiftData)
-
-```swift
-@Model
-class LocalMessage {
-    @Attribute(.unique) var id: String
-    var conversationId: String
-    var senderId: String
-    var senderName: String
-    var text: String
-    var timestamp: Date
-    var status: String
-    var isPending: Bool
-    var localId: String?
-    
-    init(id: String, conversationId: String, senderId: String, 
-         senderName: String, text: String, timestamp: Date, 
-         status: String, isPending: Bool, localId: String?) {
-        self.id = id
-        self.conversationId = conversationId
-        self.senderId = senderId
-        self.senderName = senderName
-        self.text = text
-        self.timestamp = timestamp
-        self.status = status
-        self.isPending = isPending
-        self.localId = localId
-    }
-}
-
-@Model
-class LocalConversation {
-    @Attribute(.unique) var id: String
-    var participantIds: [String]
-    var lastMessage: String?
-    var lastMessageTimestamp: Date?
-    var type: String
-    var groupName: String?
-    
-    init(id: String, participantIds: [String], lastMessage: String?, 
-         lastMessageTimestamp: Date?, type: String, groupName: String?) {
-        self.id = id
-        self.participantIds = participantIds
-        self.lastMessage = lastMessage
-        self.lastMessageTimestamp = lastMessageTimestamp
-        self.type = type
-        self.groupName = groupName
-    }
-}
-```
+### Success Metrics
+- Reduce time finding information by 60%
+- Catch 95% of action items automatically
+- Schedule meetings 3x faster
+- Never miss a critical decision
 
 ---
 
-## 3. Core Features Specification
+## 2. AI Features Architecture
 
-### 3.1 Authentication
+### 2.1 Technology Stack
 
-**Requirements:**
-- Email/password authentication
-- Google Social Login (Sign in with Google)
-- User profile creation with onboarding screen
-- Session persistence
+**LLM Provider:** OpenAI GPT-4 Turbo (primary) or Anthropic Claude Sonnet 4.5
+- Function calling support
+- Fast response times (<2s for simple queries)
+- High accuracy for structured extraction
+
+**Backend:** Firebase Cloud Functions (Node.js)
+- Secure API key management (never exposed to client)
+- Serverless scaling
+- Integration with Firestore
+
+**AI Framework:** Vercel AI SDK or LangChain
+- Structured function calling
+- Streaming responses
+- Tool use orchestration
+
+**Vector Database:** Pinecone or Firebase Vector Search (for RAG)
+- Store conversation embeddings
+- Semantic search across chat history
+- Fast retrieval (<100ms)
+
+### 2.2 System Architecture
+
+```
+iOS App (Swift)
+    ↓
+Firebase Cloud Functions (Secure Layer)
+    ↓
+OpenAI API / Claude API
+    ↓
+Structured Responses
+    ↓
+Firebase Cloud Functions (Processing)
+    ↓
+Update Firestore + Client
+```
+
+**Key Principle:** All AI API calls go through Firebase Cloud Functions to keep keys secure.
+
+---
+
+## 3. Required AI Features (15 points from rubric)
+
+### Feature 1: Thread Summarization
+
+**User Story:** As a remote developer, I want to quickly understand what happened in a long conversation thread without reading every message.
 
 **Implementation:**
-```swift
-class AuthService: ObservableObject {
-    @Published var currentUser: User?
-    @Published var isAuthenticated = false
-    @Published var needsOnboarding = false
-    
-    func signUp(email: String, password: String) async throws
-    func signIn(email: String, password: String) async throws
-    func signInWithGoogle() async throws
-    func signOut() throws
-    func completeOnboarding(displayName: String, photoURL: String?) async throws
-}
+- **Trigger:** User taps "Summarize" button on any conversation
+- **Input:** Last 50-200 messages from conversation
+- **Processing:** 
+  - Send messages to LLM via Firebase Function
+  - Prompt: "Summarize this team conversation. Focus on: key decisions, technical discussions, blockers, and action items."
+  - Return structured summary (3-5 bullet points)
+- **Output:** Display summary card with:
+  - Key points (3-5 bullets)
+  - Mentioned people (@mentions)
+  - Timestamp range
+  - "View Full Thread" button
+
+**Performance Target:** <3 seconds for 100-message summary
+
+**Prompt Template:**
+```
+You are summarizing a team chat for software professionals. 
+Analyze the conversation and provide:
+1. Key technical decisions made
+2. Blockers or issues discussed
+3. Action items identified
+4. Important updates shared
+
+Keep it concise (3-5 bullets). Focus on what matters for an engineer who missed the discussion.
+
+Conversation:
+{messages}
 ```
 
-**Onboarding Flow:**
-1. User signs up or signs in with Google
-2. Check if user profile exists in Firestore
-3. If new user → show OnboardingView
-4. User enters display name and optional photo
-5. Create user document in Firestore
-6. Navigate to main app
+### Feature 2: Action Item Extraction
 
-### 3.2 One-on-One Chat
-
-**Requirements:**
-- Start new conversations
-- Send text messages
-- Real-time message delivery
-- Message persistence
-- Optimistic UI updates
-
-**User Flow:**
-1. User selects a contact or enters contact details
-2. System creates or retrieves conversation
-3. User types message and taps send
-4. Message appears immediately in UI (optimistic)
-5. Message syncs to Firestore
-6. Recipient receives message in real-time
-7. Status updates: sending → sent → delivered → read
-
-### 3.3 Group Chat
-
-**Requirements:**
-- Create groups with 3+ participants
-- Add/remove participants (creator only)
-- Group name and avatar
-- Message attribution (show sender name)
-- Delivery tracking per participant
-
-**User Flow:**
-1. User creates group, selects participants
-2. User sets group name
-3. Messages show sender name/photo
-4. All participants see messages in real-time
-5. Read receipts show who read the message
-
-### 3.4 Real-Time Messaging
-
-**Requirements:**
-- Sub-100ms message delivery (when online)
-- Firestore real-time listeners
-- Automatic reconnection
-- Queue messages when offline
-- Sync on reconnection
-
-**Implementation Strategy:**
-- Use Firestore snapshots for real-time updates
-- Local queue for offline messages
-- Background sync when connectivity returns
-- Handle app lifecycle (foreground/background)
-
-### 3.5 Message Status & Read Receipts
-
-**Status Flow:**
-```
-User A sends message:
-1. sending → update local storage immediately (instant UI feedback)
-2. sent → written to Firestore (cloud sync complete)
-3. delivered → User B's device receives message
-4. read → User B opens chat and views message
-```
-
-**Local-First Approach:**
-- Update local SwiftData storage FIRST for instant UI
-- Then sync to Firestore in background
-- UI shows message immediately without waiting for server
+**User Story:** As a PM, I want to automatically extract action items from team conversations so nothing falls through the cracks.
 
 **Implementation:**
-- Update `status` field in Firestore
-- Update `deliveredTo` map when message received
-- Update `readBy` map when user views message
-- Show checkmarks in UI: ✓ (sent), ✓✓ (delivered), ✓✓ (read - blue)
+- **Trigger:** Automatic (runs on conversation close) or manual "Extract Actions"
+- **Input:** Conversation messages
+- **Processing:**
+  - LLM extracts structured action items
+  - Each item: description, assignee (if mentioned), deadline (if mentioned), priority
+- **Output:** 
+  - List view of action items
+  - Tap to create reminder
+  - Export to calendar/task app
+  - Notification if assigned to you
 
-**Read Receipt Logic:**
-```swift
-func markMessagesAsRead(conversationId: String, messageIds: [String]) async {
-    let userId = currentUserId
-    let timestamp = Date()
-    
-    // 1. Update local storage first (instant UI)
-    await localDB.markAsRead(messageIds)
-    
-    // 2. Update Firestore in background
-    for messageId in messageIds {
-        firestore.collection("conversations")
-            .document(conversationId)
-            .collection("messages")
-            .document(messageId)
-            .updateData([
-                "readBy.\(userId)": timestamp,
-                "status": "read"
-            ])
-    }
+**Data Model:**
+```typescript
+interface ActionItem {
+  id: string;
+  description: string;
+  assignee?: string; // userId
+  deadline?: Date;
+  priority: 'high' | 'medium' | 'low';
+  conversationId: string;
+  extractedAt: Date;
+  status: 'pending' | 'completed';
 }
 ```
 
-### 3.6 Online/Offline Presence
+**Performance Target:** <2 seconds for extraction
 
-**Requirements:**
-- Show online/offline indicator
-- Last seen timestamp
-- Real-time updates
-
-**Implementation:**
-- Update `isOnline` and `lastSeen` in Firestore
-- Use Firebase Presence system
-- Handle app lifecycle events
-- Show "Online" or "Last seen at HH:MM"
-
-### 3.7 Typing Indicators
-
-**Requirements:**
-- Show when other user is typing
-- Hide after 3 seconds of inactivity
-- Works in groups (show "User X is typing...")
-
-**Implementation:**
-- Create temporary subcollection `/conversations/{id}/typing/{userId}`
-- Set with TTL (auto-delete after 3 seconds)
-- Listen for changes
-- Debounce typing events
-
-### 3.8 Push Notifications
-
-**Requirements:**
-- **Foreground notifications ONLY** (when app is open)
-- Show sender name and message preview
-- Tap notification banner to jump to conversation
-- Simple implementation without background complexity
-
-**Implementation:**
-- Register for FCM token on app launch
-- Store token in user document
-- Use UNUserNotificationCenter for local notifications
-- Display banner when new message arrives while app is active
-- No background notification handling for MVP
-
-**Note:** Background push notifications are out of scope for MVP to keep implementation simple and fast.
-
----
-
-## 4. Service Layer Architecture
-
-### 4.1 MessageService
-
-```swift
-class MessageService: ObservableObject {
-    @Published var messages: [Message] = []
-    private var listener: ListenerRegistration?
-    
-    // Real-time message listener
-    func startListening(conversationId: String)
-    
-    // Send message with optimistic update
-    func sendMessage(conversationId: String, text: String, senderId: String) async throws
-    
-    // Mark messages as read
-    func markAsRead(conversationId: String, messageIds: [String], userId: String) async throws
-    
-    // Handle offline queue
-    func processOfflineQueue() async
-}
-```
-
-### 4.2 ConversationService
-
-```swift
-class ConversationService: ObservableObject {
-    @Published var conversations: [Conversation] = []
-    
-    // Create one-on-one conversation
-    func createOrGetConversation(participantIds: [String]) async throws -> String
-    
-    // Create group conversation
-    func createGroupConversation(participantIds: [String], groupName: String) async throws -> String
-    
-    // Get conversation by ID
-    func getConversation(id: String) async throws -> Conversation
-    
-    // Update last message
-    func updateLastMessage(conversationId: String, message: Message) async throws
-}
-```
-
-### 4.3 PresenceService
-
-```swift
-class PresenceService {
-    // Set user online
-    func setOnline(userId: String) async throws
-    
-    // Set user offline
-    func setOffline(userId: String) async throws
-    
-    // Listen to presence changes
-    func observePresence(userIds: [String]) -> AsyncStream<[String: Bool]>
-}
-```
-
-### 4.4 NotificationService
-
-```swift
-class NotificationService {
-    // Request notification permissions
-    func requestPermissions() async throws
-    
-    // Register FCM token
-    func registerToken() async throws
-    
-    // Show foreground notification
-    func showForegroundNotification(from: String, message: String, conversationId: String)
-    
-    // Handle notification tap
-    func handleNotificationTap(conversationId: String)
-}
-```
-
-### 4.5 UserService
-
-```swift
-class UserService: ObservableObject {
-    @Published var allUsers: [User] = []
-    
-    // Fetch all registered users
-    func fetchAllUsers() async throws -> [User]
-    
-    // Get specific user by ID
-    func getUser(id: String) async throws -> User
-    
-    // Search users by name
-    func searchUsers(query: String) -> [User]
-    
-    // Update user profile
-    func updateProfile(userId: String, displayName: String, photoURL: String?) async throws
-}
-```
-
----
-
-## 5. UI Components
-
-### 5.1 View Hierarchy
-
-```
-App
-├── AuthView (login/signup/Google sign-in)
-├── OnboardingView (profile setup for new users)
-├── MainTabView
-    ├── ConversationsListView
-    │   └── ConversationRowView
-    ├── UsersListView (shows all registered users)
-    │   └── UserRowView
-    ├── ChatView
-    │   ├── MessageListView
-    │   │   └── MessageBubbleView
-    │   ├── MessageInputView
-    │   └── TypingIndicatorView
-    └── ProfileView
-```
-
-### 5.2 Key Views
-
-**AuthView**
-- Email/password sign in and sign up
-- Google Sign-In button
-- Error handling and validation
-- Navigate to onboarding or main app
-
-**OnboardingView**
-- Display name input
-- Optional profile photo picker
-- Welcome message
-- "Get Started" button
-- Only shown for new users
-
-**UsersListView**
-- Shows all registered users from Firebase Auth
-- Search/filter functionality
-- Tap user to start conversation
-- Display user status (online/offline)
-- Show user profile photos and display names
-- Exclude current user from list
-
-**ConversationsListView**
-- List of all conversations
-- Show last message preview
-- Show unread badge
-- Pull to refresh
-- Search functionality
-
-**ChatView**
-- Message list (scrollable)
-- Message input field
-- Send button
-- Online/typing indicators
-- Read receipts
-- Timestamp grouping (Today, Yesterday, etc.)
-
-**MessageBubbleView**
-- Different styles for sent/received
-- Show sender name (in groups)
-- Show timestamp
-- Show status (checkmarks)
-- Simple tap to view details (no long press menus)
-
----
-
-## 6. Local-First Architecture & Optimistic Updates
-
-### 6.1 Local-First Approach
-
-**Core Principle:** Update local storage FIRST, then sync to Firestore in background.
-
-**Benefits:**
-- Instant UI feedback (no waiting for network)
-- Works offline seamlessly
-- Better perceived performance
-- User sees changes immediately
-
-### 6.2 Optimistic Update Flow
-
-```swift
-func sendMessage(text: String) async {
-    // 1. Generate temporary ID
-    let localId = UUID().uuidString
-    
-    // 2. Create message object
-    let message = Message(
-        id: localId,
-        senderId: currentUserId,
-        senderName: currentUserName,
-        text: text,
-        timestamp: Date(),
-        status: .sending
-    )
-    
-    // 3. UPDATE LOCAL STORAGE FIRST (instant UI)
-    saveToLocalStorage(message)
-    
-    // 4. Update UI immediately
-    DispatchQueue.main.async {
-        self.messages.append(message)
-    }
-    
-    // 5. THEN sync to Firestore in background
-    do {
-        let docRef = try await firestore
-            .collection("conversations/\(conversationId)/messages")
-            .addDocument(from: message)
-        
-        // 6. Update local storage with server ID
-        updateLocalMessage(localId: localId, serverId: docRef.documentID, status: .sent)
-        
-        // 7. Update UI with confirmation
-        DispatchQueue.main.async {
-            if let index = self.messages.firstIndex(where: { $0.id == localId }) {
-                self.messages[index].id = docRef.documentID
-                self.messages[index].status = .sent
-            }
+**Function Calling Schema:**
+```typescript
+{
+  name: "extract_action_items",
+  description: "Extract action items from conversation",
+  parameters: {
+    type: "object",
+    properties: {
+      action_items: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            description: { type: "string" },
+            assignee: { type: "string" },
+            deadline: { type: "string" },
+            priority: { type: "string", enum: ["high", "medium", "low"] }
+          }
         }
-    } catch {
-        // 8. Mark as failed locally
-        updateLocalMessage(localId: localId, status: .failed)
-        
-        // 9. Queue for retry
-        queueForRetry(message)
-    }
-}
-```
-
-**Key Points:**
-- User sees message appear instantly (step 3-4)
-- Network operations happen in background (step 5)
-- Failures are handled gracefully (step 8-9)
-- No blocking or waiting for server
-
-### 6.3 Sync Strategy
-
-**On App Launch:**
-1. Load messages from local SwiftData storage
-2. Display cached messages immediately (instant app launch)
-3. Start Firestore listeners in background
-4. Process offline message queue
-5. Sync read receipts and delivery status
-6. Update UI with any new messages from Firestore
-
-**On Reconnection:**
-1. Detect network connectivity change
-2. Process queued messages (send failed messages)
-3. Sync delivery/read status
-4. Update presence to online
-5. Resume real-time listeners
-
-**During Normal Operation:**
-- All writes go to local storage first
-- Firestore sync happens in background
-- Real-time listeners update UI with remote changes
-- Conflicts resolved by timestamp (last write wins)
-
----
-
-## 7. Implementation Plan (Priority Order)
-
-### Phase 1: Foundation (Hours 0-6)
-1. **Project Setup**
-   - Create Xcode project with SwiftUI
-   - Install Firebase SDK via SPM
-   - Configure Firebase project (create app, download GoogleService-Info.plist)
-   - Setup Firestore security rules
-   - Enable Google Sign-In in Firebase Console
-
-2. **Authentication**
-   - Build AuthService with email/password and Google Sign-In
-   - Create sign up/sign in views with Google button
-   - Implement session persistence
-   - Create OnboardingView for profile setup
-   - Handle new user flow (check if profile exists → show onboarding)
-
-3. **Data Models**
-   - Define Firestore models
-   - Setup SwiftData schema
-   - Create local storage layer
-
-4. **Users List Screen**
-   - Create UserService to fetch all users
-   - Build UsersListView UI
-   - Add search/filter functionality
-   - Display online/offline status
-
-### Phase 2: Core Messaging (Hours 6-14)
-5. **Basic Chat UI**
-   - ConversationsListView
-   - ChatView with message list
-   - Message input field
-   - Message bubbles (sent/received)
-   - Simple tap interactions (no long press menus)
-
-6. **Message Sending with Local-First Updates**
-   - MessageService implementation
-   - **Update local SwiftData FIRST for instant UI**
-   - Then sync to Firestore in background
-   - Real-time listener for incoming messages
-   - Display messages in UI
-
-7. **Message Persistence**
-   - Save messages to SwiftData immediately
-   - Load from local storage on launch (instant app start)
-   - Handle app lifecycle
-   - Queue failed messages for retry
-
-### Phase 3: Advanced Features (Hours 14-20)
-8. **Local-First Optimistic Updates**
-   - Implement instant message appearance (local update first)
-   - Handle server confirmation and ID replacement
-   - Retry logic for failed messages
-   - Status updates: sending → sent → delivered → read
-
-9. **Read Receipts & Status**
-   - Track message delivery (update local then Firestore)
-   - Track message read status
-   - Display checkmarks in UI
-   - Update read receipts when user opens chat
-
-10. **Group Chat**
-    - Create group conversation flow (no group avatars)
-    - Handle multiple participants
-    - Show sender attribution in messages
-
-11. **Presence & Typing**
-    - Online/offline indicators
-    - Typing indicators
-    - Last seen timestamps
-
-### Phase 4: Polish & Testing (Hours 20-24)
-12. **Push Notifications (Foreground Only)**
-    - Setup FCM
-    - Request permissions
-    - Handle foreground notifications only (app is open)
-    - Show notification banner for incoming messages
-    - No background notification implementation
-
-13. **Testing & Bug Fixes**
-    - Test on two physical devices
-    - Test offline scenarios and local-first updates
-    - Test app lifecycle
-    - Test group chat with 3+ users
-    - Test users list screen
-    - Test Google Sign-In flow
-    - Test onboarding for new users
-    - Fix critical bugs
-
----
-
-## 8. Firestore Security Rules
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
-    // Users collection
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-    }
-    
-    // Conversations collection
-    match /conversations/{conversationId} {
-      allow read: if isSignedIn() && 
-        request.auth.uid in resource.data.participantIds;
-      allow create: if isSignedIn() && 
-        request.auth.uid in request.resource.data.participantIds;
-      allow update: if isSignedIn() && 
-        request.auth.uid in resource.data.participantIds;
-      
-      // Messages subcollection
-      match /messages/{messageId} {
-        allow read: if isSignedIn() && 
-          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
-        allow create: if isSignedIn() && 
-          request.auth.uid == request.resource.data.senderId &&
-          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
-        allow update: if isSignedIn() && 
-          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
       }
     }
   }
 }
 ```
 
+### Feature 3: Smart Search
+
+**User Story:** As a developer, I want to search for "that discussion about Redis caching" without knowing exact keywords.
+
+**Implementation:**
+- **Trigger:** User types in search bar
+- **Type:** Semantic search (not just keyword matching)
+- **Processing:**
+  - Generate embedding for search query
+  - Vector search against conversation embeddings
+  - Rank by relevance
+  - LLM re-ranks top results with context
+- **Output:**
+  - Ranked search results
+  - Show context (surrounding messages)
+  - Highlight relevant sections
+  - "Jump to message" button
+
+**RAG Pipeline:**
+1. **Indexing** (background):
+   - Every message → generate embedding
+   - Store in Pinecone: `{messageId, embedding, text, metadata}`
+2. **Search** (real-time):
+   - Query → generate embedding
+   - Vector search → top 20 results
+   - LLM re-ranks with context → top 5
+   - Return to user
+
+**Performance Target:** <1 second for search results
+
+**Prompt for Re-ranking:**
+```
+Given the user's search query and these message results, rank them by relevance.
+Consider: semantic meaning, recency, participants, context.
+
+Query: {searchQuery}
+Results: {messages}
+
+Return the top 5 most relevant messages with brief explanations.
+```
+
+### Feature 4: Priority Message Detection
+
+**User Story:** As an engineer in multiple time zones, I want urgent messages to be highlighted so I don't miss critical blockers.
+
+**Implementation:**
+- **Trigger:** Automatic (real-time as messages arrive)
+- **Input:** New message content
+- **Processing:**
+  - Fast LLM call (<500ms) to classify priority
+  - Factors: urgency words, @mentions, keywords (BLOCKED, URGENT, ASAP), sender, time
+- **Output:**
+  - High-priority badge on message
+  - Push notification (even if app open)
+  - Move to top of conversation list
+  - Option to snooze/dismiss
+
+**Priority Levels:**
+- 🔴 **Critical:** Production down, security issue, blocking deployment
+- 🟡 **High:** Review needed, deadline today, direct request
+- 🟢 **Normal:** Everything else
+
+**Performance Target:** <500ms classification (must be real-time)
+
+**Function Calling:**
+```typescript
+{
+  name: "classify_message_priority",
+  parameters: {
+    message: string,
+    sender: string,
+    timestamp: string,
+    mentions: string[]
+  },
+  returns: {
+    priority: "critical" | "high" | "normal",
+    reason: string,
+    confidence: number
+  }
+}
+```
+
+### Feature 5: Decision Tracking
+
+**User Story:** As a PM, I want to track what decisions were made and when, without manually taking notes.
+
+**Implementation:**
+- **Trigger:** Automatic (background processing) or manual "Track Decision"
+- **Input:** Conversation messages
+- **Processing:**
+  - LLM identifies decision points
+  - Extracts: decision, context, participants, timestamp
+  - Stores in decisions collection
+- **Output:**
+  - Decisions timeline view
+  - Filter by project/person/date
+  - Link back to original conversation
+  - Export capabilities
+
+**Data Model:**
+```typescript
+interface Decision {
+  id: string;
+  summary: string; // "Decided to use PostgreSQL for analytics DB"
+  context: string; // Background/reasoning
+  participants: string[]; // userIds
+  conversationId: string;
+  timestamp: Date;
+  tags: string[]; // ["technical", "architecture"]
+  relatedDecisions?: string[]; // IDs of related decisions
+}
+```
+
+**Performance Target:** <4 seconds to extract decisions from 100-message thread
+
 ---
 
-## 9. Cloud Functions (for Notifications)
+## 4. Advanced AI Feature: Proactive Assistant (10 points from rubric)
 
-```javascript
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-admin.initializeApp();
+### Overview
+A background AI agent that monitors conversations and proactively suggests meeting times when it detects scheduling needs, eliminating the "when are you free?" back-and-forth.
 
-exports.sendMessageNotification = functions.firestore
-  .document('conversations/{conversationId}/messages/{messageId}')
+**User Story:** As a distributed team member, I want the AI to detect when we need to schedule a meeting and automatically suggest times that work for everyone.
+
+### 4.1 Detection Phase
+
+**Triggers (monitored in real-time):**
+- Keywords: "let's meet", "schedule a call", "find time", "when are you free"
+- Meeting-related questions
+- Calendar event mentions
+- Multiple people discussing availability
+- Follow-ups on action items that need sync discussion
+
+**Detection Logic:**
+```typescript
+// Firebase Function listens to new messages
+function detectSchedulingNeed(message: Message, conversation: Conversation) {
+  // LLM classification
+  const needsMeeting = await classifyMessage(message, {
+    type: "scheduling_detection",
+    context: getRecentMessages(conversation, 10)
+  });
+  
+  if (needsMeeting.probability > 0.7) {
+    triggerProactiveAssistant(conversation, needsMeeting);
+  }
+}
+```
+
+### 4.2 Data Collection Phase
+
+When scheduling need detected:
+1. **Identify participants** - From @mentions and conversation context
+2. **Fetch availability** - Get calendar data (if integrated) or ask users
+3. **Determine meeting purpose** - Extract from context
+4. **Estimate duration** - Default 30min, or extract from conversation
+
+**Calendar Integration Options:**
+- **Simple:** Users share "typical availability" in profile (9am-5pm PST)
+- **Advanced:** OAuth to Google Calendar/Outlook (bonus feature)
+
+### 4.3 Suggestion Phase
+
+**LLM Agent Flow:**
+1. Analyze conversation context
+2. Identify optimal time slots (consider time zones!)
+3. Generate natural language suggestion
+4. Present to users
+
+**Output Example:**
+```
+🤖 Assistant: I noticed you're trying to schedule a meeting about the API redesign.
+
+Suggested times (all zones):
+• Tomorrow 2pm PST / 5pm EST / 10pm GMT (60 min)
+• Friday 10am PST / 1pm EST / 6pm GMT (60 min)
+
+Participants: @alice @bob @charlie
+Should I send calendar invites?
+
+[Confirm] [Suggest Different Times] [Dismiss]
+```
+
+### 4.4 Execution Phase (Optional)
+
+If user confirms:
+- Generate calendar event
+- Send to all participants
+- Add event link to conversation
+- Track RSVP status
+
+### 4.5 Learning Phase
+
+Over time, learn:
+- Preferred meeting times by person
+- Meeting duration patterns by type
+- Who typically needs to be included
+
+**Performance Targets:**
+- Detection: <500ms
+- Suggestion generation: <5s
+- Accuracy: 80%+ suggestions accepted
+
+### 4.6 Implementation Details
+
+**Multi-Step Agent Architecture:**
+```typescript
+// Agent orchestration
+class ProactiveSchedulingAgent {
+  async execute(conversation: Conversation) {
+    // Step 1: Analyze need
+    const analysis = await this.analyzeSchedulingNeed(conversation);
+    
+    // Step 2: Gather data
+    const participants = await this.identifyParticipants(conversation);
+    const availability = await this.getAvailability(participants);
+    
+    // Step 3: Find time slots
+    const slots = await this.findOptimalSlots(availability, analysis);
+    
+    // Step 4: Generate suggestion
+    const suggestion = await this.generateSuggestion(slots, analysis);
+    
+    // Step 5: Present to users
+    await this.presentSuggestion(conversation, suggestion);
+  }
+}
+```
+
+**Tool Use/Function Calling:**
+```typescript
+const tools = [
+  {
+    name: "get_user_timezone",
+    description: "Get timezone for a user",
+    parameters: { userId: "string" }
+  },
+  {
+    name: "check_availability",
+    description: "Check if time slot works for users",
+    parameters: { 
+      userIds: "string[]",
+      startTime: "datetime",
+      duration: "number"
+    }
+  },
+  {
+    name: "create_calendar_event",
+    description: "Create calendar event",
+    parameters: {
+      title: "string",
+      startTime: "datetime",
+      duration: "number",
+      participants: "string[]"
+    }
+  }
+];
+```
+
+---
+
+## 5. AI Chat Interface Options
+
+### Option A: Dedicated AI Assistant (Recommended)
+
+**Implementation:**
+- Special "AI Assistant" chat in conversation list
+- Always available
+- Chat-based interaction for all AI features
+- Can ask questions naturally
+
+**Pros:**
+- Natural interaction
+- Centralized AI experience
+- Easy to discover features
+
+**UI Example:**
+```
+Conversations
+├── AI Assistant ⚡
+├── #engineering-team
+├── #design-sync
+└── @alice
+```
+
+### Option B: Contextual Menus
+
+**Implementation:**
+- Long-press message → "Ask AI"
+- Conversation header → AI actions dropdown
+- Inline AI suggestions
+
+**Pros:**
+- Context-aware
+- Less intrusive
+- Faster access
+
+### Option C: Hybrid (Best)
+
+Combine both:
+- Dedicated AI chat for general queries
+- Contextual actions for specific tasks
+- Proactive suggestions appear inline
+
+---
+
+## 6. AI Service Architecture
+
+### 6.1 Firebase Cloud Functions Structure
+
+```
+functions/
+├── src/
+│   ├── ai/
+│   │   ├── openai.ts           # OpenAI client
+│   │   ├── embeddings.ts       # Generate embeddings
+│   │   ├── prompts.ts          # Prompt templates
+│   │   └── tools.ts            # Function calling schemas
+│   ├── features/
+│   │   ├── summarization.ts    # Feature 1
+│   │   ├── actionItems.ts      # Feature 2
+│   │   ├── smartSearch.ts      # Feature 3
+│   │   ├── priority.ts         # Feature 4
+│   │   ├── decisions.ts        # Feature 5
+│   │   └── proactive.ts        # Advanced feature
+│   ├── triggers/
+│   │   ├── onMessageCreate.ts  # Real-time triggers
+│   │   └── scheduled.ts        # Batch processing
+│   └── index.ts
+├── package.json
+└── tsconfig.json
+```
+
+### 6.2 Key Cloud Functions
+
+**1. Summarize Conversation**
+```typescript
+exports.summarizeConversation = functions.https.onCall(async (data, context) => {
+  const { conversationId, messageLimit } = data;
+  
+  // Auth check
+  if (!context.auth) throw new Error('Unauthorized');
+  
+  // Fetch messages
+  const messages = await getMessages(conversationId, messageLimit);
+  
+  // Call OpenAI
+  const summary = await openai.chat.completions.create({
+    model: "gpt-4-turbo",
+    messages: [
+      { role: "system", content: SUMMARIZATION_PROMPT },
+      { role: "user", content: JSON.stringify(messages) }
+    ]
+  });
+  
+  return { summary: summary.choices[0].message.content };
+});
+```
+
+**2. Extract Action Items**
+```typescript
+exports.extractActionItems = functions.https.onCall(async (data, context) => {
+  // Similar structure but use function calling
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4-turbo",
+    messages: [...],
+    functions: [ACTION_ITEM_FUNCTION],
+    function_call: { name: "extract_action_items" }
+  });
+  
+  const actionItems = JSON.parse(
+    completion.choices[0].message.function_call.arguments
+  );
+  
+  // Store in Firestore
+  await storeActionItems(conversationId, actionItems);
+  
+  return actionItems;
+});
+```
+
+**3. Priority Classification (Real-time)**
+```typescript
+exports.onMessageCreated = functions.firestore
+  .document('conversations/{convId}/messages/{msgId}')
   .onCreate(async (snap, context) => {
     const message = snap.data();
-    const conversationId = context.params.conversationId;
     
-    // Get conversation to find recipients
-    const conversationSnap = await admin.firestore()
-      .collection('conversations')
-      .doc(conversationId)
-      .get();
+    // Fast priority check
+    const priority = await classifyPriority(message);
     
-    const conversation = conversationSnap.data();
-    const recipientIds = conversation.participantIds.filter(
-      id => id !== message.senderId
-    );
-    
-    // Get recipient FCM tokens
-    const usersSnap = await admin.firestore()
-      .collection('users')
-      .where(admin.firestore.FieldPath.documentId(), 'in', recipientIds)
-      .get();
-    
-    const tokens = [];
-    usersSnap.forEach(doc => {
-      const fcmToken = doc.data().fcmToken;
-      if (fcmToken) tokens.push(fcmToken);
-    });
-    
-    if (tokens.length === 0) return null;
-    
-    // Send notification
-    const payload = {
-      notification: {
-        title: message.senderName,
-        body: message.text,
-        sound: 'default'
-      },
-      data: {
-        conversationId: conversationId,
-        type: 'new_message'
-      }
-    };
-    
-    return admin.messaging().sendToDevice(tokens, payload);
+    if (priority === 'critical' || priority === 'high') {
+      // Update message with priority
+      await snap.ref.update({ priority, aiClassified: true });
+      
+      // Send push notification
+      await sendPriorityNotification(message);
+    }
   });
 ```
 
----
+### 6.3 RAG Pipeline Implementation
 
-## 10. Testing Checklist
+**Indexing Pipeline:**
+```typescript
+// Background job - index messages for search
+exports.indexMessage = functions.firestore
+  .document('conversations/{convId}/messages/{msgId}')
+  .onCreate(async (snap, context) => {
+    const message = snap.data();
+    
+    // Generate embedding
+    const embedding = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: message.text
+    });
+    
+    // Store in Pinecone
+    await pinecone.upsert({
+      id: snap.id,
+      values: embedding.data[0].embedding,
+      metadata: {
+        conversationId: context.params.convId,
+        senderId: message.senderId,
+        timestamp: message.timestamp,
+        text: message.text
+      }
+    });
+  });
+```
 
-### Critical Path Testing
-
-**Authentication Test:**
-- [ ] Sign up with email/password
-- [ ] Sign in with email/password
-- [ ] Sign in with Google
-- [ ] New user sees onboarding screen
-- [ ] Complete onboarding and create profile
-- [ ] Existing user bypasses onboarding
-
-**Users List Test:**
-- [ ] Users list shows all registered users
-- [ ] Current user not shown in list
-- [ ] Search/filter works
-- [ ] Online/offline status displays
-- [ ] Tap user to start conversation
-
-**Two Device Test:**
-- [ ] User A sends message to User B
-- [ ] Message appears INSTANTLY on User A (local update)
-- [ ] Message syncs to Firestore
-- [ ] Message appears on User B's device in real-time
-- [ ] User B sends reply
-- [ ] Reply appears on User A's device
-
-**Local-First Update Test:**
-- [ ] Send message - appears instantly in UI
-- [ ] Check local storage - message saved immediately
-- [ ] Message shows "sending" status
-- [ ] Status updates to "sent" after Firestore sync
-- [ ] No delay in UI update
-
-**Offline Test:**
-- [ ] Disable wifi on User A's device
-- [ ] User A sends message
-- [ ] Message appears in UI immediately (local update)
-- [ ] Message marked as "sending" (not sent)
-- [ ] Enable wifi
-- [ ] Message syncs to Firestore automatically
-- [ ] Status updates to "sent"
-- [ ] User B receives message
-
-**Persistence Test:**
-- [ ] Send messages between users
-- [ ] Force quit app on both devices
-- [ ] Reopen app
-- [ ] All messages still visible (loaded from local storage)
-- [ ] Messages appear instantly on launch
-
-**App Lifecycle Test:**
-- [ ] Send message while app in foreground
-- [ ] Background app
-- [ ] Send message from other user
-- [ ] Foreground app - message should appear
-
-**Group Chat Test:**
-- [ ] Create group with 3 users (no group avatar)
-- [ ] Set group name only
-- [ ] Each user sends message
-- [ ] All messages visible to all users
-- [ ] Messages show sender name/photo
-
-**Read Receipts Test:**
-- [ ] User A sends message
-- [ ] User B receives (show delivered ✓✓)
-- [ ] User B opens chat (show read ✓✓ blue)
-- [ ] Read status updates in User A's chat
-
-**Presence Test:**
-- [ ] User A opens app → shows online
-- [ ] User A closes app → shows offline
-- [ ] User A opens chat → User B sees "User A is typing..."
-
-**Push Notifications Test (Foreground Only):**
-- [ ] User B has app open
-- [ ] User A sends message
-- [ ] User B sees notification banner at top
-- [ ] Tap banner → opens conversation
-- [ ] (Background notifications out of scope)
+**Search Pipeline:**
+```typescript
+exports.smartSearch = functions.https.onCall(async (data, context) => {
+  const { query, conversationId } = data;
+  
+  // 1. Generate query embedding
+  const queryEmbedding = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: query
+  });
+  
+  // 2. Vector search
+  const results = await pinecone.query({
+    vector: queryEmbedding.data[0].embedding,
+    topK: 20,
+    filter: { conversationId }
+  });
+  
+  // 3. LLM re-ranking
+  const reranked = await openai.chat.completions.create({
+    model: "gpt-4-turbo",
+    messages: [
+      { role: "system", content: RERANK_PROMPT },
+      { role: "user", content: JSON.stringify({ query, results }) }
+    ]
+  });
+  
+  return JSON.parse(reranked.choices[0].message.content);
+});
+```
 
 ---
 
-## 11. Deployment
+## 7. Data Models (AI-specific)
 
-### TestFlight Deployment
-
-1. **Prepare App:**
-   - Set bundle identifier
-   - Configure signing & capabilities
-   - Enable push notifications capability
-   - Set version and build number
-
-2. **Archive & Upload:**
-   - Product → Archive
-   - Upload to App Store Connect
-   - Wait for processing
-
-3. **TestFlight Setup:**
-   - Create beta testing group
-   - Add internal testers
-   - Submit for review (if needed)
-   - Share TestFlight link
-
-### Local Testing (Fallback)
-
-If TestFlight is blocked:
-- Provide detailed setup instructions
-- Include Firebase configuration steps
-- Explain how to run on simulator/physical device
-- Document any environment-specific setup
-
----
-
-## 12. Performance Targets
-
-- **Message Send Time:** < 200ms (optimistic UI)
-- **Message Delivery:** < 100ms (when both online)
-- **App Launch:** < 2 seconds to show cached messages
-- **Sync Time:** < 500ms to sync after reconnection
-- **UI Responsiveness:** 60fps scrolling in message list
-
----
-
-## 13. Success Criteria
-
-The MVP is considered complete when:
-
-✅ Google Sign-In works alongside email/password auth  
-✅ New users see onboarding screen to create profile  
-✅ Users list screen shows all registered users  
-✅ Two users can chat in real-time  
-✅ Messages appear INSTANTLY in UI (local-first update)  
-✅ Messages persist across app restarts (loaded from local storage)  
-✅ Local-first optimistic UI works (no delay in message appearance)  
-✅ Online/offline presence is visible  
-✅ Message timestamps are shown  
-✅ User authentication works  
-✅ Group chat works with 3+ users (no group avatar needed)  
-✅ Read receipts function properly (local update then Firestore)  
-✅ Push notifications work in foreground (banner appears when app open)  
-✅ App is deployed (TestFlight or runnable locally)  
-✅ Offline mode works seamlessly (messages queue and sync on reconnect)  
-
----
-
-## 14. Known Limitations & Future Work
-
-**MVP Scope Limitations:**
-- No media messages (images, videos, files)
-- No message editing/deletion/copy actions
-- No voice/video calls
-- No end-to-end encryption
-- Foreground notifications only (no background push)
-- No message search
-- No group avatars
-- No phone number authentication
-- Simple user list (no contact sync)
-
-**Local-First Architecture Benefits:**
-- ✅ Instant UI feedback (no loading spinners)
-- ✅ Works perfectly offline
-- ✅ Better perceived performance
-- ✅ Messages never get stuck
-- ✅ Seamless online/offline transitions
-
-**Post-MVP Enhancements:**
-- Image/video sharing with local caching
-- Voice messages
-- Message actions (edit, delete, copy, forward)
-- Profile customization
-- Message reactions and emojis
-- Advanced search across conversations
-- Block/report users
-- Chat backup/export
-- Background push notifications
-- Contact sync
-- Group management (avatars, admin controls)
-- End-to-end encryption
-
----
-
-## Appendix A: Key Code Snippets
-
-### Google Sign-In Implementation
-
-```swift
-// Install: GoogleSignIn SDK via SPM
-import GoogleSignIn
-import FirebaseAuth
-
-func signInWithGoogle() async throws {
-    // 1. Get client ID from Firebase config
-    guard let clientID = FirebaseApp.app()?.options.clientID else {
-        throw AuthError.missingClientID
-    }
-    
-    // 2. Configure Google Sign-In
-    let config = GIDConfiguration(clientID: clientID)
-    GIDSignIn.sharedInstance.configuration = config
-    
-    // 3. Get root view controller
-    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-          let rootViewController = windowScene.windows.first?.rootViewController else {
-        throw AuthError.noRootViewController
-    }
-    
-    // 4. Sign in with Google
-    let result = try await GIDSignIn.sharedInstance.signIn(
-        withPresenting: rootViewController
-    )
-    
-    // 5. Get Google credentials
-    guard let idToken = result.user.idToken?.tokenString else {
-        throw AuthError.missingIDToken
-    }
-    let accessToken = result.user.accessToken.tokenString
-    
-    // 6. Create Firebase credential
-    let credential = GoogleAuthProvider.credential(
-        withIDToken: idToken,
-        accessToken: accessToken
-    )
-    
-    // 7. Sign in to Firebase
-    let authResult = try await Auth.auth().signIn(with: credential)
-    
-    // 8. Check if user needs onboarding
-    let userExists = try await checkUserExists(uid: authResult.user.uid)
-    if !userExists {
-        needsOnboarding = true
-    }
+### ActionItems Collection
+```typescript
+/actionItems/{itemId}
+{
+  id: string;
+  description: string;
+  assignee?: string;
+  assigneeName?: string;
+  deadline?: Timestamp;
+  priority: 'high' | 'medium' | 'low';
+  conversationId: string;
+  conversationName: string;
+  extractedAt: Timestamp;
+  extractedBy: 'ai' | 'user';
+  status: 'pending' | 'completed' | 'dismissed';
+  completedAt?: Timestamp;
 }
 ```
 
-### Firebase Configuration
-
-```swift
-// FirebaseManager.swift
-import FirebaseCore
-import FirebaseFirestore
-import FirebaseAuth
-
-class FirebaseManager {
-    static let shared = FirebaseManager()
-    
-    let auth: Auth
-    let firestore: Firestore
-    
-    private init() {
-        FirebaseApp.configure()
-        self.auth = Auth.auth()
-        self.firestore = Firestore.firestore()
-        
-        // Enable offline persistence
-        let settings = FirestoreSettings()
-        settings.isPersistenceEnabled = true
-        firestore.settings = settings
-    }
+### Decisions Collection
+```typescript
+/decisions/{decisionId}
+{
+  id: string;
+  summary: string;
+  context: string;
+  participants: string[];
+  conversationId: string;
+  timestamp: Timestamp;
+  tags: string[];
+  relatedDecisions: string[];
+  createdBy: 'ai' | 'user';
 }
 ```
 
-### Real-time Message Listener
-
-```swift
-func startListening(conversationId: String) {
-    listener = firestore
-        .collection("conversations")
-        .document(conversationId)
-        .collection("messages")
-        .order(by: "timestamp", descending: false)
-        .addSnapshotListener { [weak self] snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-            
-            let messages = documents.compactMap { doc -> Message? in
-                try? doc.data(as: Message.self)
-            }
-            
-            DispatchQueue.main.async {
-                self?.messages = messages
-            }
-        }
+### Summaries Collection
+```typescript
+/summaries/{summaryId}
+{
+  id: string;
+  conversationId: string;
+  summary: string;
+  bulletPoints: string[];
+  messageCount: number;
+  timeRange: { start: Timestamp, end: Timestamp };
+  participants: string[];
+  generatedAt: Timestamp;
+  accuracy?: number; // user feedback
 }
 ```
 
-### Fetch All Users
-
-```swift
-// UserService.swift
-func fetchAllUsers() async throws -> [User] {
-    let snapshot = try await firestore
-        .collection("users")
-        .getDocuments()
-    
-    let users = snapshot.documents.compactMap { doc -> User? in
-        try? doc.data(as: User.self)
-    }
-    
-    // Filter out current user
-    let filteredUsers = users.filter { $0.id != Auth.auth().currentUser?.uid }
-    
-    DispatchQueue.main.async {
-        self.allUsers = filteredUsers
-    }
-    
-    return filteredUsers
-}
-```
-
-### Local-First Message Send
-
-```swift
-func sendMessage(conversationId: String, text: String) async throws {
-    let messageId = UUID().uuidString
-    let message = Message(
-        id: messageId,
-        senderId: currentUserId,
-        senderName: currentUserName,
-        text: text,
-        timestamp: Date(),
-        status: .sending
-    )
-    
-    // 1. SAVE TO LOCAL STORAGE FIRST
-    try localDB.save(message)
-    
-    // 2. UPDATE UI IMMEDIATELY
-    await MainActor.run {
-        messages.append(message)
-    }
-    
-    // 3. SYNC TO FIRESTORE IN BACKGROUND
-    let docRef = try await firestore
-        .collection("conversations")
-        .document(conversationId)
-        .collection("messages")
-        .addDocument(from: message)
-    
-    // 4. UPDATE WITH SERVER ID
-    message.id = docRef.documentID
-    message.status = .sent
-    try localDB.update(message)
-    
-    await MainActor.run {
-        if let index = messages.firstIndex(where: { $0.id == messageId }) {
-            messages[index] = message
-        }
-    }
+### AI Usage Metrics
+```typescript
+/users/{userId}/aiUsage
+{
+  summarizationsCount: number;
+  actionItemsExtracted: number;
+  searchesPerformed: number;
+  priorityMessagesReceived: number;
+  decisionsTracked: number;
+  proactiveSuggestions: number;
+  lastUsedAt: Timestamp;
 }
 ```
 
 ---
 
-**Document Version:** 2.0  
-**Last Updated:** October 20, 2025  
+## 8. UI/UX Design
+
+### 8.1 AI Chat Assistant View
+
+```
+┌─────────────────────────┐
+│  ⚡ AI Assistant        │
+├─────────────────────────┤
+│                         │
+│  🤖 Hi! I can help you: │
+│  • Summarize threads    │
+│  • Find action items    │
+│  • Search conversations │
+│  • Track decisions      │
+│                         │
+│  Try: "Summarize #eng"  │
+│  or "Find my tasks"     │
+│                         │
+├─────────────────────────┤
+│ [Type a message...]     │
+└─────────────────────────┘
+```
+
+### 8.2 Contextual AI Menu
+
+Long-press message:
+```
+┌─────────────────────────┐
+│ ✨ Ask AI               │
+│ 📝 Summarize Thread     │
+│ ✅ Extract Actions      │
+│ 🔍 Find Related         │
+│ 🎯 Set Priority         │
+│ 📌 Track Decision       │
+│ ─────────────────       │
+│ Copy                    │
+│ Delete                  │
+└─────────────────────────┘
+```
+
+### 8.3 Action Items View
+
+```
+┌─────────────────────────┐
+│  📋 Action Items        │
+├─────────────────────────┤
+│ 🔴 Review PR #234       │
+│    @you • Due: Today    │
+│    From: #eng-backend   │
+│                         │
+│ 🟡 Update docs          │
+│    @alice • This week   │
+│    From: #docs-team     │
+│                         │
+│ 🟢 Research GraphQL     │
+│    Unassigned           │
+│    From: DM with Bob    │
+└─────────────────────────┘
+```
+
+### 8.4 Proactive Assistant Suggestion
+
+```
+┌─────────────────────────┐
+│ 🤖 I noticed you're     │
+│ trying to schedule a    │
+│ meeting about the API   │
+│ redesign.               │
+│                         │
+│ 📅 Suggested times:     │
+│                         │
+│ Tomorrow 2pm PST        │
+│ 5pm EST / 10pm GMT      │
+│ (60 min)                │
+│                         │
+│ Friday 10am PST         │
+│ 1pm EST / 6pm GMT       │
+│ (60 min)                │
+│                         │
+│ [@alice @bob @charlie]  │
+│                         │
+│ [✓ Confirm]  [✏️ Edit]  │
+└─────────────────────────┘
+```
+
+---
+
+## 9. Performance Targets (for A grade)
+
+| Feature | Target | Excellent |
+|---------|--------|-----------|
+| Summarization | <3s | <2s |
+| Action Items | <3s | <2s |
+| Smart Search | <1s | <500ms |
+| Priority Detection | <1s | <500ms |
+| Decision Tracking | <5s | <3s |
+| Proactive Suggestions | <5s | <3s |
+| Natural language accuracy | 80%+ | 90%+ |
+
+---
+
+## 10. Testing Strategy
+
+### 10.1 Unit Tests
+- Prompt engineering validation
+- Function calling schema tests
+- Response parsing tests
+- Error handling
+
+### 10.2 Integration Tests
+- Firebase Functions with mock OpenAI
+- Firestore data flow
+- RAG pipeline
+
+### 10.3 AI Quality Tests
+- Test summarization with sample conversations (10 test cases)
+- Validate action item extraction (20 test messages)
+- Priority classification accuracy (50 messages with labels)
+- Search relevance (10 queries with expected results)
+
+### 10.4 User Testing
+- Test with 3-5 remote team members
+- Measure time saved
+- Track suggestion acceptance rate
+- Gather qualitative feedback
+
+---
+
+## 11. Success Criteria (Rubric Alignment)
+
+### Section 3: AI Features (30 points target)
+
+**Required Features (15 points) - Target: 14-15**
+- ✅ All 5 features fully implemented
+- ✅ 90%+ command accuracy
+- ✅ <2s response times
+- ✅ Clean UI integration
+- ✅ Proper error handling
+
+**Persona Fit (5 points) - Target: 5**
+- ✅ Clear mapping to Remote Team Professional pain points
+- ✅ Daily usefulness demonstrated
+- ✅ Purpose-built experience
+
+**Advanced Feature (10 points) - Target: 9-10**
+- ✅ Proactive Assistant fully functional
+- ✅ Multi-step workflow (5+ steps)
+- ✅ Handles edge cases
+- ✅ <15s response time
+- ✅ Uses agent framework correctly
+
+### Section 4: Technical Implementation (10 points target)
+
+**Architecture (5 points) - Target: 5**
+- ✅ Clean, organized code
+- ✅ API keys secured in Cloud Functions
+- ✅ Function calling implemented
+- ✅ RAG pipeline working
+- ✅ Rate limiting
+
+**Auth & Data (5 points) - Target: 5**
+- ✅ Already completed in MVP
+
+---
+
+## 12. Known Limitations & Trade-offs
+
+**MVP Scope:**
+- No voice message transcription
+- No image analysis
+- No multi-language support (English only)
+- Simple calendar integration (no OAuth)
+- No ML model training (all via API)
+
+**Cost Considerations:**
+- OpenAI API costs: ~$0.01-0.05 per conversation summarization
+- Embedding storage: ~$0.10/GB in Pinecone
+- Budget for testing: $50-100
+
+**Rate Limiting:**
+- Max 10 AI requests per user per minute
+- Max 100 AI requests per day (free tier)
+- Implement caching for repeated queries
+
+---
+
+## 13. Deployment Checklist
+
+**Before Demo:**
+- [ ] All 5 AI features working in demo environment
+- [ ] Proactive Assistant tested with real scheduling scenarios
+- [ ] Firebase Functions deployed and tested
+- [ ] OpenAI API key secured
+- [ ] Test with 2-3 people in different time zones
+- [ ] Record demo video (5-7 minutes)
+- [ ] Prepare 1-page Persona Brainlift
+- [ ] Create social media post
+
+**Technical:**
+- [ ] Error handling for all AI calls
+- [ ] Loading states in UI
+- [ ] Graceful degradation if AI fails
+- [ ] Rate limiting enforced
+- [ ] Costs monitored
+
+---
+
+## Appendix A: Sample Prompts
+
+### Thread Summarization Prompt
+```
+You are an AI assistant helping remote software teams stay productive.
+Summarize this team conversation for someone who missed it.
+
+Focus on:
+1. Key technical decisions made
+2. Blockers or issues discussed  
+3. Action items identified
+4. Important updates shared
+
+Be concise (3-5 bullet points). Use clear, professional language.
+
+Conversation:
+{messages}
+
+Format:
+**Key Points:**
+• Point 1
+• Point 2
+• Point 3
+
+**Action Items:**
+• Item 1 (@person)
+• Item 2 (@person)
+```
+
+### Proactive Assistant Detection Prompt
+```
+Analyze this conversation and determine if the team needs to schedule a meeting.
+
+Look for:
+- Direct scheduling requests ("let's meet", "find time")
+- Multiple people coordinating availability
+- Complex topics needing sync discussion
+- Follow-ups on action items
+
+Context: {recentMessages}
+New Message: {currentMessage}
+
+Return JSON:
+{
+  "needsMeeting": true/false,
+  "confidence": 0.0-1.0,
+  "reason": "explanation",
+  "suggestedDuration": 30/60,
+  "urgency": "high/medium/low",
+  "suggestedParticipants": ["@user1", "@user2"]
+}
+```
+
+---
+
+**Document Version:** 1.0  
 **Status:** Ready for Implementation  
-**Key Updates:** Google Sign-In, Onboarding Flow, Users List Screen, Local-First Architecture, Foreground Notifications Only
+**Target Completion:** 4-5 days post-MVP

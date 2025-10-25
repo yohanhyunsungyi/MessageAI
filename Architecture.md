@@ -1,106 +1,172 @@
 graph TB
-    subgraph iOS["iOS App - Client Side"]
-        subgraph Presentation["Presentation Layer"]
-            AuthView[Auth Views<br/>SignIn, SignUp, Onboarding]
-            MainTab[Main Tab View]
-            UsersView[Users List View]
-            ConvView[Conversations View]
-            ChatView[Chat View<br/>Messages, Input, Bubbles]
-            ProfileView[Profile View]
+    subgraph User["👤 User Devices"]
+        Device1[Device A - Alice<br/>iOS iPhone]
+        Device2[Device B - Bob<br/>iOS iPhone]
+    end
+    
+    subgraph iOSApp["📱 iOS App - Swift + SwiftUI"]
+        subgraph Views["UI Layer"]
+            AuthUI[Auth Views<br/>Email + Google SignIn]
+            ChatUI[Chat View<br/>Messages + Input]
+            ConvList[Conversations List]
+            UsersList[Users List]
+            AIAssistant[⚡ AI Assistant Chat]
+            ActionItemsUI[Action Items View]
+            DecisionsUI[Decisions Timeline]
+            SearchUI[Smart Search]
         end
         
-        subgraph ViewModels["ViewModel Layer"]
-            AuthVM[Auth ViewModel]
-            UsersVM[Users ViewModel]
-            ConvVM[Conversations ViewModel]
+        subgraph ViewModels["ViewModels"]
             ChatVM[Chat ViewModel]
+            AIVM[AI ViewModel]
         end
         
-        subgraph Services["Service Layer"]
-            AuthSvc[Auth Service<br/>Email & Google Sign-In]
-            UserSvc[User Service<br/>Fetch Users]
-            ConvSvc[Conversation Service<br/>Create, Fetch, Update]
-            MsgSvc[Message Service<br/>Local-First Send/Receive]
-            PresenceSvc[Presence Service<br/>Online/Offline]
-            NotifSvc[Notification Service<br/>FCM, Foreground]
-            LocalSvc[Local Storage Service<br/>SwiftData]
+        subgraph Services["Services Layer"]
+            AuthSvc[Auth Service]
+            MsgSvc[Message Service<br/>LOCAL-FIRST]
+            ConvSvc[Conversation Service]
+            UserSvc[User Service]
+            AISvc[AI Service<br/>API Wrapper]
+            PresenceSvc[Presence Service]
+            NotifSvc[Notification Service]
         end
         
-        subgraph Data["Data Layer"]
-            Models[Models<br/>User, Message, Conversation]
-            LocalModels[Local Models<br/>SwiftData Model]
-            LocalDB[(SwiftData<br/>Local Database)]
-        end
-        
-        subgraph SDK["Firebase SDK"]
-            FBManager[Firebase Manager<br/>Singleton]
-            FBAuth[Firebase Auth SDK]
-            FBFirestore[Firestore SDK<br/>Offline Persistence]
-            FBFCM[FCM SDK]
+        subgraph LocalStorage["Local Storage"]
+            SwiftData[(SwiftData<br/>Offline Database<br/>Messages + Conversations)]
         end
     end
     
-    subgraph External["External Services"]
-        subgraph Google["Google Services"]
+    subgraph Firebase["🔥 Firebase Cloud Platform"]
+        subgraph RealtimeDB["Real-time Services"]
+            Firestore[(Cloud Firestore<br/>Collections:<br/>users, conversations,<br/>messages, actionItems,<br/>decisions, suggestions)]
+            FBAuth[Firebase Auth<br/>Email + Google OAuth]
+            FCM[Cloud Messaging<br/>Push Notifications]
+        end
+        
+        subgraph CloudFunctions["☁️ Cloud Functions - Node.js"]
+            subgraph CoreAI["5 Core AI Features"]
+                F1[1. Thread Summarization<br/>Target: 2s]
+                F2[2. Action Item Extraction<br/>Target: 2s]
+                F3[3. Smart Search + RAG<br/>Target: 1s]
+                F4[4. Priority Detection<br/>Target: 500ms]
+                F5[5. Decision Tracking<br/>Target: 4s]
+            end
+            
+            subgraph AdvancedAI["Advanced Feature"]
+                ProactiveDetect[Proactive Detection<br/>Monitors for scheduling]
+                ProactiveAgent[Multi-Step Agent<br/>1. Get participants<br/>2. Get timezones<br/>3. Check availability<br/>4. Generate time slots<br/>5. Format suggestion<br/>Target: 15s]
+            end
+            
+            subgraph AIInfra["AI Infrastructure"]
+                RAGIndex[RAG Indexing<br/>Message → Embedding]
+                RAGSearch[RAG Search<br/>Query → Results]
+                NLCommands[Natural Language<br/>Command Parser]
+            end
+        end
+    end
+    
+    subgraph ExternalServices["🌐 External Services"]
+        subgraph GoogleServices["Google"]
             GoogleAuth[Google Sign-In SDK<br/>OAuth 2.0]
         end
         
-        subgraph Firebase["Firebase Backend"]
-            FirebaseAuth[Firebase Authentication<br/>User Management]
-            Firestore[(Cloud Firestore<br/>NoSQL Database)]
-            FCM[Firebase Cloud Messaging<br/>Push Notifications]
+        subgraph AIServices["AI Services"]
+            OpenAI[OpenAI GPT-4 Turbo<br/>- Chat Completions<br/>- Function Calling<br/>- Embeddings API]
+            Pinecone[Pinecone Vector DB<br/>Semantic Search<br/>1536 dimensions]
         end
     end
     
-    AuthView --> AuthVM
-    UsersView --> UsersVM
-    ConvView --> ConvVM
-    ChatView --> ChatVM
+    %% User Interactions
+    Device1 --> iOSApp
+    Device2 --> iOSApp
     
-    AuthVM --> AuthSvc
-    UsersVM --> UserSvc
-    ConvVM --> ConvSvc
+    %% UI Layer Connections
+    AuthUI --> AuthSvc
+    ChatUI --> ChatVM
+    ConvList --> ConvSvc
+    UsersList --> UserSvc
+    AIAssistant --> AIVM
+    ActionItemsUI --> AISvc
+    DecisionsUI --> AISvc
+    SearchUI --> AISvc
+    
+    %% ViewModel Connections
     ChatVM --> MsgSvc
-    ChatVM --> PresenceSvc
+    ChatVM --> AISvc
+    AIVM --> AISvc
     
-    AuthSvc --> FBManager
-    UserSvc --> FBManager
-    ConvSvc --> FBManager
-    MsgSvc --> FBManager
-    PresenceSvc --> FBManager
-    NotifSvc --> FBManager
-    
-    MsgSvc --> LocalSvc
-    ConvSvc --> LocalSvc
-    LocalSvc --> LocalDB
-    LocalSvc --> LocalModels
-    
-    FBManager --> FBAuth
-    FBManager --> FBFirestore
-    FBManager --> FBFCM
-    
+    %% Service Layer - MVP Features
+    AuthSvc --> FBAuth
     AuthSvc --> GoogleAuth
-    GoogleAuth -.OAuth Token.-> FirebaseAuth
+    MsgSvc --> SwiftData
+    MsgSvc --> Firestore
+    ConvSvc --> Firestore
+    UserSvc --> Firestore
+    PresenceSvc --> Firestore
+    NotifSvc --> FCM
     
-    FBAuth <-->|REST API| FirebaseAuth
-    FBFirestore <-->|WebSocket| Firestore
-    FBFCM <-->|HTTP/2| FCM
+    %% Service Layer - AI Features
+    AISvc --> CloudFunctions
     
-    MsgSvc --> Models
-    ConvSvc --> Models
-    UserSvc --> Models
+    %% Local-First Architecture
+    SwiftData -.Save Local First.-> ChatUI
+    MsgSvc -.Then Sync.-> Firestore
     
-    MainTab --> UsersView
-    MainTab --> ConvView
-    MainTab --> ProfileView
-    UsersView -.Navigate.-> ChatView
-    ConvView -.Navigate.-> ChatView
+    %% Real-time Sync
+    Firestore -.WebSocket<br/>Real-time.-> MsgSvc
+    Firestore -.WebSocket<br/>Real-time.-> ConvSvc
     
-    style LocalDB fill:#e1f5ff
-    style Firestore fill:#ffd700
-    style FirebaseAuth fill:#ffd700
-    style FCM fill:#ffd700
-    style LocalSvc fill:#90ee90
-    style MsgSvc fill:#90ee90
-    style FBFirestore fill:#ff9999
-    style GoogleAuth fill:#4285f4
+    %% Cloud Functions - AI Processing
+    F1 --> OpenAI
+    F2 --> OpenAI
+    F3 --> OpenAI
+    F3 --> Pinecone
+    F4 --> OpenAI
+    F5 --> OpenAI
+    ProactiveDetect --> OpenAI
+    ProactiveAgent --> OpenAI
+    
+    %% RAG Pipeline
+    RAGIndex --> OpenAI
+    RAGIndex --> Pinecone
+    RAGSearch --> Pinecone
+    RAGSearch --> OpenAI
+    
+    %% AI Results Storage
+    F2 -.Store.-> Firestore
+    F5 -.Store.-> Firestore
+    ProactiveAgent -.Store.-> Firestore
+    
+    %% Firestore Triggers
+    Firestore -.Trigger<br/>onMessageCreate.-> F4
+    Firestore -.Trigger<br/>onMessageCreate.-> ProactiveDetect
+    Firestore -.Trigger<br/>onMessageCreate.-> RAGIndex
+    
+    %% Google OAuth Flow
+    GoogleAuth -.OAuth Token.-> FBAuth
+    
+    %% Push Notifications
+    FCM --> Device1
+    FCM --> Device2
+    
+    %% Data Flow Labels
+    MsgSvc -.Priority<br/>Messages.-> NotifSvc
+    ProactiveAgent -.Scheduling<br/>Suggestions.-> ChatUI
+    
+    %% Styling
+    style SwiftData fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
+    style Firestore fill:#ffd700,stroke:#ff9800,stroke-width:3px
+    style OpenAI fill:#10a37f,stroke:#059669,stroke-width:3px
+    style Pinecone fill:#6366f1,stroke:#4f46e5,stroke-width:3px
+    style MsgSvc fill:#90ee90,stroke:#22c55e,stroke-width:3px
+    style AISvc fill:#4285f4,stroke:#1976d2,stroke-width:3px
+    style F1 fill:#dceefb,stroke:#3b82f6
+    style F2 fill:#dceefb,stroke:#3b82f6
+    style F3 fill:#dceefb,stroke:#3b82f6
+    style F4 fill:#dceefb,stroke:#3b82f6
+    style F5 fill:#dceefb,stroke:#3b82f6
+    style ProactiveAgent fill:#ffd6cc,stroke:#ef4444,stroke-width:3px
+    style GoogleAuth fill:#4285f4,stroke:#1976d2
+    style FCM fill:#ffa000,stroke:#f57c00
+    style RAGIndex fill:#f3e8ff,stroke:#9333ea
+    style RAGSearch fill:#f3e8ff,stroke:#9333ea

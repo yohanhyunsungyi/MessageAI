@@ -9,6 +9,8 @@
 import Foundation
 import FirebaseCore
 import FirebaseFunctions
+import FirebaseAuth
+import Combine
 
 /// Service for AI-powered features using Cloud Functions
 /// Handles summarization, action items, search, and more
@@ -17,7 +19,7 @@ class AIService: ObservableObject {
 
     // MARK: - Properties
 
-    private let functions = Functions.functions()
+    private let functions: Functions
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -25,11 +27,23 @@ class AIService: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        // CRITICAL: Use the default Firebase app instance
+        // This ensures auth context is automatically included in callable function requests
+        self.functions = Functions.functions()
+
+        // NOTE: Firebase automatically routes to the correct region based on function deployment
+        // No need to specify region explicitly for callable functions
+
         // Configure Functions for emulator if needed
         #if DEBUG
         // Uncomment to use emulator during development
         // functions.useEmulator(withHost: "localhost", port: 5001)
         #endif
+    }
+
+    // Computed property to access shared Auth instance
+    private var auth: Auth {
+        FirebaseManager.shared.auth
     }
 
     // MARK: - Rate Limiting
@@ -75,6 +89,13 @@ class AIService: ObservableObject {
     /// - Parameter messageLimit: Maximum messages to include (default: 200)
     /// - Returns: Summary object with key points
     func summarizeConversation(conversationId: String, messageLimit: Int = 200) async throws -> Summary {
+        // Check authentication first
+        guard auth.currentUser != nil else {
+            let error = NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "You must be signed in to use AI features"])
+            print("❌ [AIService] User not authenticated")
+            throw error
+        }
+
         guard checkRateLimit() else {
             throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Rate limit exceeded"])
         }
@@ -91,6 +112,19 @@ class AIService: ObservableObject {
         }
 
         do {
+            let userId = auth.currentUser?.uid ?? "unknown"
+            print("📝 [AIService] User authenticated: \(userId)")
+
+            // Get fresh ID token to ensure it's valid
+            if let user = auth.currentUser {
+                do {
+                    let token = try await user.getIDToken()
+                    print("📝 [AIService] Got ID token (length: \(token.count))")
+                } catch {
+                    print("⚠️ [AIService] Failed to get ID token: \(error)")
+                }
+            }
+
             print("📝 [AIService] Requesting summary for conversation: \(conversationId)")
 
             let params: [String: Any] = [

@@ -102,11 +102,14 @@ struct ChatView: View {
                         ProgressView()
                             .progressViewStyle(.circular)
                             .scaleEffect(0.8)
+                            .tint(Color.black)
                     } else {
                         Image(systemName: "sparkles")
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.black)
+                            .font(.system(size: 16, weight: .semibold))
                     }
                 }
+                .padding(8)
                 .disabled(isSummarizing || (viewModel?.messages.isEmpty ?? true))
             }
         }
