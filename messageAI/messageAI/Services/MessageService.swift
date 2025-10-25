@@ -464,10 +464,23 @@ class MessageService: ObservableObject {
     private func mergeMessages(_ remoteMessages: [Message], conversationId: String) async {
         print("🔄 Merging: local=\(messages.count), remote=\(remoteMessages.count)")
 
+        // Detect new messages for in-app notifications (only when NOT viewing this conversation)
+        let existingMessageIds = Set(messages.map { $0.id })
+        let newMessages = remoteMessages.filter { message in
+            !existingMessageIds.contains(message.id) &&
+            message.senderId != currentUserId
+        }
+
         // Firestore is the source of truth - use remote data directly
         messages = remoteMessages.sorted { $0.timestamp < $1.timestamp }
 
         print("✅ Merged result: \(messages.count) messages")
+
+        // Show in-app notifications ONLY if user is NOT viewing this conversation
+        // This prevents duplicates: FCM handles background, we handle foreground for other conversations
+        if !newMessages.isEmpty && currentConversationId != conversationId {
+            await showForegroundNotifications(newMessages, conversationId: conversationId)
+        }
 
         // Cache to local storage (async, non-blocking)
         Task { @MainActor in
@@ -479,6 +492,31 @@ class MessageService: ObservableObject {
                 }
             }
             print("💾 Cached \(remoteMessages.count) messages locally")
+        }
+    }
+
+    /// Show foreground notifications for new messages (only when NOT viewing the conversation)
+    private func showForegroundNotifications(_ newMessages: [Message], conversationId: String) async {
+        guard let notificationService = notificationService else {
+            print("⚠️ NotificationService not available")
+            return
+        }
+
+        // Only show if NOT currently viewing this conversation
+        guard currentConversationId != conversationId else {
+            print("📱 User is viewing \(conversationId) - skipping in-app notification")
+            return
+        }
+
+        // Show notifications for new messages from other conversations
+        for message in newMessages {
+            print("🔔 Showing foreground notification for: \(message.senderName)")
+            await notificationService.showForegroundNotification(
+                from: message.senderName,
+                message: message.text,
+                conversationId: conversationId,
+                senderImageURL: message.senderPhotoURL
+            )
         }
     }
 
