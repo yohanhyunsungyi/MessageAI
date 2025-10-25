@@ -238,22 +238,91 @@ struct ConversationsListView: View {
     // MARK: - Conversations List View
 
     private func conversationsListView(viewModel: ConversationsViewModel) -> some View {
-        List(viewModel.filteredConversations, id: \.id) { conversation in
-            NavigationLink(value: conversation.id) {
-                ConversationRowView(
-                    conversation: conversation,
-                    displayName: viewModel.getConversationName(conversation),
-                    subtitle: viewModel.getConversationSubtitle(conversation),
-                    photoURL: viewModel.getConversationPhotoURL(conversation),
-                    unreadCount: 0 // TODO: Calculate actual unread count from MessageService
-                )
+        List {
+            // AI Assistant - Special row always at top
+            aiAssistantRow
+
+            // Regular conversations
+            ForEach(viewModel.filteredConversations, id: \.id) { conversation in
+                NavigationLink(value: conversation.id) {
+                    ConversationRowView(
+                        conversation: conversation,
+                        displayName: viewModel.getConversationName(conversation),
+                        subtitle: viewModel.getConversationSubtitle(conversation),
+                        photoURL: viewModel.getConversationPhotoURL(conversation),
+                        unreadCount: 0 // TODO: Calculate actual unread count from MessageService
+                    )
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
         }
         .listStyle(.plain)
         .background(UIStyleGuide.Colors.background)
+    }
+
+    // MARK: - AI Assistant Row
+
+    private var aiAssistantRow: some View {
+        NavigationLink {
+            AIAssistantChatView()
+        } label: {
+            HStack(spacing: UIStyleGuide.Spacing.md) {
+                // AI Icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.purple.opacity(0.8),
+                                    Color.blue.opacity(0.8)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 56, height: 56)
+
+                    Text("⚡")
+                        .font(.system(size: 28))
+                }
+
+                // Content
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("AI Assistant")
+                            .font(UIStyleGuide.Typography.bodyBold)
+                            .foregroundColor(UIStyleGuide.Colors.textPrimary)
+
+                        Spacer()
+                    }
+
+                    Text("Ask me anything about your conversations")
+                        .font(UIStyleGuide.Typography.caption)
+                        .foregroundColor(UIStyleGuide.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(UIStyleGuide.Colors.textTertiary)
+            }
+            .padding(UIStyleGuide.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(Color.blue.opacity(0.2), lineWidth: 1.5)
+                    )
+            )
+            .padding(.horizontal, UIStyleGuide.Spacing.md)
+            .padding(.vertical, UIStyleGuide.Spacing.xs)
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     // MARK: - Helper Methods

@@ -129,6 +129,46 @@ Generate 2-3 optimal meeting time suggestions that:
 
 Format times clearly for each timezone.`;
 
+/**
+ * Natural Language Command Parser Prompt
+ * Used to parse user intent from AI Assistant chat
+ */
+const NL_COMMAND_PARSER_PROMPT = `You are a command parser for an AI messaging assistant.
+
+Parse the user's message and determine their intent. Return a JSON object with:
+{
+  "action": "action_name",
+  "parameters": { /* relevant parameters */ }
+}
+
+Supported actions:
+1. "summarize_conversation" - User wants to summarize a conversation
+   Parameters: { conversationId: string, messageLimit?: number }
+
+2. "extract_action_items" - User wants to find action items/tasks
+   Parameters: { conversationId: string, messageLimit?: number }
+
+3. "search_messages" - User wants to search for specific messages
+   Parameters: { query: string, conversationId?: string, topK?: number }
+
+4. "extract_decisions" - User wants to track decisions
+   Parameters: { conversationId: string, messageLimit?: number }
+
+5. "list_action_items" - User wants to see their pending tasks
+   Parameters: {}
+
+6. "general_query" - Anything else (general questions, greetings, etc.)
+   Parameters: {}
+
+Examples:
+- "Summarize #engineering" → {"action": "summarize_conversation", "parameters": {"conversationId": "engineering"}}
+- "What are my tasks?" → {"action": "list_action_items", "parameters": {}}
+- "Search for redis" → {"action": "search_messages", "parameters": {"query": "redis"}}
+- "Find decisions in #product" → {"action": "extract_decisions", "parameters": {"conversationId": "product"}}
+- "Hello" → {"action": "general_query", "parameters": {}}
+
+Return ONLY valid JSON, no additional text.`;
+
 module.exports = {
   SUMMARIZATION_PROMPT,
   ACTION_ITEMS_PROMPT,
@@ -137,4 +177,5 @@ module.exports = {
   DECISION_TRACKING_PROMPT,
   SCHEDULING_DETECTION_PROMPT,
   SCHEDULING_SUGGESTION_PROMPT,
+  NL_COMMAND_PARSER_PROMPT,
 };

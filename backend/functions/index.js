@@ -15,6 +15,7 @@ const { searchMessages } = require("./src/features/vectorSearch");
 const { summarizeConversation } = require("./src/features/summarization");
 const { extractActionItems } = require("./src/features/actionItems");
 const { extractDecisions } = require("./src/features/decisions");
+const { parseAndExecuteCommand } = require("./src/features/nlCommands");
 const { withRateLimit } = require("./src/middleware/rateLimit");
 
 /**
@@ -448,5 +449,53 @@ exports.extractDecisions = functions.https.onCall(
         );
       }
     }, "decision-tracking"),
+);
+
+/**
+ * AI Assistant - Natural Language Command Interface
+ * Parse user's natural language query and execute appropriate AI feature
+ * Call from iOS: functions.httpsCallable("aiAssistant").call({ message: "..." })
+ */
+exports.aiAssistant = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to use AI assistant",
+        );
+      }
+
+      const { message, context: userContext } = data;
+
+      if (!message || typeof message !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "message is required and must be a string",
+        );
+      }
+
+      console.log(`🤖 AI Assistant request from user: ${context.auth.uid}`);
+      console.log(`   Message: "${message}"`);
+
+      try {
+        const result = await parseAndExecuteCommand(
+            message,
+            context.auth.uid,
+            userContext || {},
+        );
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ AI Assistant error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to process AI assistant request",
+        );
+      }
+    }, "ai-assistant"),
 );
 
