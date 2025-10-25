@@ -302,7 +302,7 @@ struct ConversationsListView: View {
             .padding(.horizontal, UIStyleGuide.Spacing.md)
             .padding(.vertical, UIStyleGuide.Spacing.xs)
         }
-        .listRowInsets(EdgeInsets())
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
     }
