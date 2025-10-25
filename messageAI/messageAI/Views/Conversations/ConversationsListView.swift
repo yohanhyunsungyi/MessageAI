@@ -28,6 +28,7 @@ struct ConversationsListView: View {
     @State private var showCreateGroup = false
     @State private var navigationPath = NavigationPath()
     @State private var pendingNavigationConversationId: String?
+    @State private var showSmartSearch = false
 
     // MARK: - Injected ViewModel (from MainTabView for global monitoring)
 
@@ -69,10 +70,21 @@ struct ConversationsListView: View {
                     }
                 }
                 .searchable(
-                    text: searchTextBinding,
+                    text: .constant(""),
                     placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Search conversations"
+                    prompt: "Search all messages with AI"
                 )
+                .onSubmit(of: .search) {
+                    showSmartSearch = true
+                }
+                .onChange(of: searchTextBinding.wrappedValue) { _, newValue in
+                    if !newValue.isEmpty {
+                        showSmartSearch = true
+                    }
+                }
+                .sheet(isPresented: $showSmartSearch) {
+                    SmartSearchView()
+                }
                 .refreshable {
                     await conversationsViewModel?.refresh()
                 }
