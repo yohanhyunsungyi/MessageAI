@@ -14,6 +14,7 @@ const { indexMessageInPinecone, classifyPriority } = require("./src/triggers/onM
 const { searchMessages } = require("./src/features/vectorSearch");
 const { summarizeConversation } = require("./src/features/summarization");
 const { extractActionItems } = require("./src/features/actionItems");
+const { extractDecisions } = require("./src/features/decisions");
 const { withRateLimit } = require("./src/middleware/rateLimit");
 
 /**
@@ -37,8 +38,9 @@ exports.sendMessageNotification = functions.firestore
           console.error(`⚠️ Background indexing failed: ${error.message}`);
         });
 
-        // Classify message priority (non-blocking, best-effort)
-        classifyPriority(message, context, snap.ref).catch((error) => {
+        // Classify message priority and extract action items (await to ensure completion)
+        // This must complete before function ends so action items are created
+        await classifyPriority(message, context, snap.ref).catch((error) => {
           console.error(`⚠️ Priority classification failed: ${error.message}`);
         });
 
@@ -398,5 +400,53 @@ exports.extractActionItems = functions.https.onCall(
         );
       }
     }, "action-items"),
+);
+
+/**
+ * Decision Tracking
+ * Extract key decisions from conversation threads
+ * Call from iOS: functions.httpsCallable("extractDecisions").call({ conversationId: "...", messageLimit: 200 })
+ */
+exports.extractDecisions = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to extract decisions",
+        );
+      }
+
+      const { conversationId, messageLimit } = data;
+
+      if (!conversationId || typeof conversationId !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "conversationId is required and must be a string",
+        );
+      }
+
+      console.log(`🎯 Decision extraction request from user: ${context.auth.uid}`);
+      console.log(`   Conversation: ${conversationId}`);
+
+      try {
+        const result = await extractDecisions(
+            conversationId,
+            context.auth.uid,
+            messageLimit || 200,
+        );
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ Decision extraction error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to extract decisions",
+        );
+      }
+    }, "decision-tracking"),
 );
 

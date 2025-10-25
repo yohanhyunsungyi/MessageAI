@@ -390,10 +390,98 @@ class AIService: ObservableObject {
 
     /// Extract decisions from a conversation
     /// - Parameter conversationId: ID of the conversation
+    /// - Parameter messageLimit: Maximum messages to include (default: 200)
     /// - Returns: Array of decisions
-    func extractDecisions(conversationId: String) async throws -> [String] {
-        // TODO: Implement in PR #28
-        throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not yet implemented"])
+    func extractDecisions(conversationId: String, messageLimit: Int = 200) async throws -> [Decision] {
+        // Check authentication first
+        guard auth.currentUser != nil else {
+            let error = NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "You must be signed in to use AI features"])
+            print("❌ [AIService] User not authenticated")
+            throw error
+        }
+
+        guard checkRateLimit() else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Rate limit exceeded"])
+        }
+
+        guard !conversationId.isEmpty else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Conversation ID cannot be empty"])
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            let userId = auth.currentUser?.uid ?? "unknown"
+            print("🎯 [AIService] User authenticated: \(userId)")
+
+            // Get fresh ID token to ensure it's valid
+            if let user = auth.currentUser {
+                do {
+                    let token = try await user.getIDToken()
+                    print("🎯 [AIService] Got ID token (length: \(token.count))")
+                } catch {
+                    print("⚠️ [AIService] Failed to get ID token: \(error)")
+                }
+            }
+
+            print("🎯 [AIService] Extracting decisions for conversation: \(conversationId)")
+
+            let params: [String: Any] = [
+                "conversationId": conversationId,
+                "messageLimit": messageLimit
+            ]
+
+            let result = try await functions.httpsCallable("extractDecisions").call(params)
+
+            guard let data = result.data as? [String: Any] else {
+                throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response format"])
+            }
+
+            // Parse the response
+            guard let decisionsData = data["decisions"] as? [[String: Any]] else {
+                throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid decisions format"])
+            }
+
+            // Convert to Decision models
+            let decisions = decisionsData.compactMap { decisionData -> Decision? in
+                guard let id = decisionData["id"] as? String,
+                      let summary = decisionData["summary"] as? String,
+                      let context = decisionData["context"] as? String,
+                      let participants = decisionData["participants"] as? [String],
+                      let tags = decisionData["tags"] as? [String],
+                      let conversationId = decisionData["conversationId"] as? String,
+                      let conversationName = decisionData["conversationName"] as? String,
+                      let createdBy = decisionData["createdBy"] as? String else {
+                    return nil
+                }
+
+                return Decision(
+                    id: id,
+                    summary: summary,
+                    context: context,
+                    participants: participants,
+                    tags: tags,
+                    conversationId: conversationId,
+                    conversationName: conversationName,
+                    timestamp: Date(),
+                    createdBy: createdBy
+                )
+            }
+
+            print("✅ [AIService] Extracted \(decisions.count) decisions")
+            return decisions
+
+        } catch {
+            let errorMsg = handleError(error)
+            errorMessage = errorMsg
+            print("❌ [AIService] Decision extraction failed: \(errorMsg)")
+            throw error
+        }
     }
 
     // MARK: - Test Function

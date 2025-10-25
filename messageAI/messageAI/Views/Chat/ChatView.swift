@@ -20,6 +20,9 @@ struct ChatView: View {
     @State private var isExtractingActions = false
     @State private var showActionItemsAlert = false
     @State private var extractedItemsCount = 0
+    @State private var isExtractingDecisions = false
+    @State private var showDecisionsAlert = false
+    @State private var extractedDecisionsCount = 0
 
     let conversationId: String
     let localStorageService: LocalStorageService?
@@ -97,6 +100,26 @@ struct ChatView: View {
 
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 8) {
+                    // Track Decision button
+                    Button {
+                        Task {
+                            await extractDecisions()
+                        }
+                    } label: {
+                        if isExtractingDecisions {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.8)
+                                .tint(Color.black)
+                        } else {
+                            Image(systemName: "checkmark.seal")
+                                .foregroundColor(Color.black)
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                    }
+                    .padding(8)
+                    .disabled(isExtractingDecisions || (viewModel?.messages.isEmpty ?? true))
+
                     // Extract Actions button
                     Button {
                         Task {
@@ -170,6 +193,11 @@ struct ChatView: View {
         } message: {
             Text("Successfully extracted \(extractedItemsCount) action item\(extractedItemsCount == 1 ? "" : "s"). Check the Action Items tab to view them.")
         }
+        .alert("Decisions Tracked", isPresented: $showDecisionsAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Successfully tracked \(extractedDecisionsCount) decision\(extractedDecisionsCount == 1 ? "" : "s"). Check the Decisions tab to view them.")
+        }
     }
 
     // MARK: - AI Features
@@ -212,6 +240,26 @@ struct ChatView: View {
         }
 
         isExtractingActions = false
+    }
+
+    private func extractDecisions() async {
+        isExtractingDecisions = true
+
+        do {
+            print("🎯 [ChatView] Extracting decisions for conversation: \(conversationId)")
+            let decisions = try await aiService.extractDecisions(conversationId: conversationId)
+            extractedDecisionsCount = decisions.count
+            showDecisionsAlert = true
+            print("✅ [ChatView] Extracted \(decisions.count) decisions")
+        } catch {
+            print("❌ [ChatView] Failed to extract decisions: \(error.localizedDescription)")
+            // Show error to user
+            if let viewModel = viewModel {
+                viewModel.errorMessage = "Failed to extract decisions. Please try again."
+            }
+        }
+
+        isExtractingDecisions = false
     }
 
     private func setupViewModel() {

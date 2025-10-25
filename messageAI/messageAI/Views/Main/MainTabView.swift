@@ -55,17 +55,29 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
+            // Decisions Tab
+            DecisionsListView()
+                .tabItem {
+                    VStack {
+                        Image(systemName: selectedTab == 3 ? "checkmark.seal.fill" : "checkmark.seal")
+                            .font(.system(size: UIStyleGuide.IconSize.medium))
+                        Text("Decisions")
+                            .font(UIStyleGuide.Typography.caption)
+                    }
+                }
+                .tag(3)
+
             // Profile Tab
             ProfileView()
                 .tabItem {
                     VStack {
-                        Image(systemName: selectedTab == 3 ? "person.circle.fill" : "person.circle")
+                        Image(systemName: selectedTab == 4 ? "person.circle.fill" : "person.circle")
                             .font(.system(size: UIStyleGuide.IconSize.medium))
                         Text("Profile")
                             .font(UIStyleGuide.Typography.caption)
                     }
                 }
-                .tag(3)
+                .tag(4)
         }
         .accentColor(UIStyleGuide.Colors.tabBarSelected)
         .task {
