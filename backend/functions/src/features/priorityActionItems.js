@@ -70,14 +70,12 @@ Identify any tasks, TODOs, or action items that need to be done.`;
 
     console.log(`   ✅ Extracted ${actionItems.length} action item(s)`);
 
-    // Save action items to Firestore
+    // Save action items to Firestore root collection (for iOS app compatibility)
     const batch = admin.firestore().batch();
     const savedItems = [];
 
     for (const item of actionItems) {
       const actionItemRef = admin.firestore()
-          .collection("conversations")
-          .doc(conversationId)
           .collection("actionItems")
           .doc();
 
@@ -89,6 +87,7 @@ Identify any tasks, TODOs, or action items that need to be done.`;
         deadline: item.deadline || null,
         priority: item.priority || "medium",
         status: "pending",
+        extractedAt: admin.firestore.FieldValue.serverTimestamp(),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         createdFrom: "priority-message",
         sourceMessageId: message.id || null,
