@@ -6,16 +6,21 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// Main tab view container with three tabs: Conversations, Users, and Profile
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var notificationService: NotificationService
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedTab = 0
+    @State private var conversationsViewModel: ConversationsViewModel?
+    @State private var hasSetupMonitoring = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
             // Conversations Tab
-            ConversationsListView()
+            ConversationsListView(conversationsViewModel: conversationsViewModel)
                 .tabItem {
                     VStack {
                         Image(systemName: selectedTab == 0 ? "message.fill" : "message")
@@ -51,6 +56,12 @@ struct MainTabView: View {
                 .tag(2)
         }
         .accentColor(UIStyleGuide.Colors.tabBarSelected)
+        .task {
+            if !hasSetupMonitoring {
+                await setupGlobalMonitoring()
+                hasSetupMonitoring = true
+            }
+        }
         .onAppear {
             // Customize tab bar appearance
             let appearance = UITabBarAppearance()
@@ -65,6 +76,34 @@ struct MainTabView: View {
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
+    }
+
+    // MARK: - Global Monitoring Setup
+
+    /// Setup global conversation monitoring that persists across tab switches
+    private func setupGlobalMonitoring() async {
+        print("🔔 Setting up global conversation monitoring...")
+
+        // Initialize services with proper ModelContext
+        let localStorageService = LocalStorageService(modelContext: modelContext)
+        let conversationService = ConversationService(
+            localStorageService: localStorageService,
+            notificationService: notificationService
+        )
+        let viewModel = ConversationsViewModel(
+            conversationService: conversationService,
+            authService: authService,
+            notificationService: notificationService
+        )
+
+        // Update state
+        conversationsViewModel = viewModel
+
+        // Load conversations and start listening
+        await viewModel.loadConversations()
+        viewModel.startListening()
+
+        print("✅ Global conversation monitoring active")
     }
 }
 

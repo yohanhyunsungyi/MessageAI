@@ -29,8 +29,18 @@ struct ConversationsListView: View {
     @State private var navigationPath = NavigationPath()
     @State private var pendingNavigationConversationId: String?
 
+    // MARK: - Injected ViewModel (from MainTabView for global monitoring)
+
+    private let injectedViewModel: ConversationsViewModel?
+
     private var conversationsViewModel: ConversationsViewModel? {
-        vmWrapper.viewModel
+        injectedViewModel ?? vmWrapper.viewModel
+    }
+
+    // MARK: - Initialization
+
+    init(conversationsViewModel: ConversationsViewModel? = nil) {
+        self.injectedViewModel = conversationsViewModel
     }
 
     // MARK: - Body
@@ -108,13 +118,6 @@ struct ConversationsListView: View {
                         setupViewModel()
                         hasSetup = true
                     }
-                }
-                .onAppear {
-                    // Restart listener when view appears (handles tab switches)
-                    conversationsViewModel?.startListening()
-                }
-                .onDisappear {
-                    conversationsViewModel?.stopListening()
                 }
                 .onChange(of: conversationsViewModel?.errorMessage) { _, newValue in
                     showError = newValue != nil
@@ -237,31 +240,51 @@ struct ConversationsListView: View {
     // MARK: - Helper Methods
 
     private func setupViewModel() {
-        // Initialize services with proper ModelContext
-        let localStorageService = LocalStorageService(modelContext: modelContext)
-        let service = ConversationService(
-            localStorageService: localStorageService,
-            notificationService: notificationService
-        )
-        let viewModel = ConversationsViewModel(
-            conversationService: service,
-            authService: authService,
-            notificationService: notificationService
-        )
+        // If we have an injected ViewModel from MainTabView, use it for services
+        if let injectedVM = injectedViewModel {
+            // Extract the conversation service for group creation
+            // Note: We can't directly access private properties, so we'll create a new one
+            let localStorageService = LocalStorageService(modelContext: modelContext)
+            let service = ConversationService(
+                localStorageService: localStorageService,
+                notificationService: notificationService
+            )
+            conversationService = service
 
-        // Initialize UsersViewModel for group creation
-        let userService = UserService()
-        let usersVM = UsersViewModel(userService: userService)
+            // Initialize UsersViewModel for group creation
+            let userService = UserService()
+            usersViewModel = UsersViewModel(userService: userService)
 
-        // Update state
-        conversationService = service
-        usersViewModel = usersVM
-        vmWrapper.viewModel = viewModel
+            print("📱 Using injected ConversationsViewModel with global monitoring")
+        } else {
+            // Fallback: Create local ViewModel (for previews or standalone usage)
+            let localStorageService = LocalStorageService(modelContext: modelContext)
+            let service = ConversationService(
+                localStorageService: localStorageService,
+                notificationService: notificationService
+            )
+            let viewModel = ConversationsViewModel(
+                conversationService: service,
+                authService: authService,
+                notificationService: notificationService
+            )
 
-        // Load data
-        Task {
-            await viewModel.loadConversations()
-            viewModel.startListening()
+            // Initialize UsersViewModel for group creation
+            let userService = UserService()
+            let usersVM = UsersViewModel(userService: userService)
+
+            // Update state
+            conversationService = service
+            usersViewModel = usersVM
+            vmWrapper.viewModel = viewModel
+
+            // Load data and start listening locally
+            Task {
+                await viewModel.loadConversations()
+                viewModel.startListening()
+            }
+
+            print("📱 Using local ConversationsViewModel")
         }
     }
 }
