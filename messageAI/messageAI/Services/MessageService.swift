@@ -438,25 +438,52 @@ class MessageService: ObservableObject {
         }
     }
 
-    /// Track seen messages to avoid duplicate processing
-    /// Note: Notifications are now handled entirely by FCM via backend Cloud Functions
-    /// This tracking is kept for future features that may need to detect new messages
+    /// Check for new messages from background monitoring and show notifications
+    /// This is called by background listeners when user is NOT viewing a specific chat
     private var lastSeenMessageIds: [String: Set<String>] = [:]
 
     private func checkForNotifications(messages: [Message], conversationId: String) async {
-        // Initialize tracking for this conversation if needed
-        if lastSeenMessageIds[conversationId] == nil {
-            lastSeenMessageIds[conversationId] = Set(messages.map { $0.id })
+        guard let notificationService = notificationService else {
             return
         }
 
+        // Initialize tracking for this conversation if needed
+        if lastSeenMessageIds[conversationId] == nil {
+            lastSeenMessageIds[conversationId] = Set(messages.map { $0.id })
+            return // Don't show notifications on initial load
+        }
+
+        let previousMessageIds = lastSeenMessageIds[conversationId] ?? Set()
         let currentMessageIds = Set(messages.map { $0.id })
+
+        // Find new message IDs
+        let newMessageIds = currentMessageIds.subtracting(previousMessageIds)
+
+        // Get the actual new messages from other users
+        let newMessages = messages.filter { message in
+            newMessageIds.contains(message.id) &&
+            message.senderId != currentUserId
+        }
 
         // Update tracking
         lastSeenMessageIds[conversationId] = currentMessageIds
 
-        // Notifications are handled by FCM push notifications from backend
-        // No need to show in-app notifications here to avoid duplicates
+        // Only show notifications if user is NOT currently viewing this conversation
+        guard activeConversationId != conversationId else {
+            print("📱 [Background] User is viewing \(conversationId) - suppressing notification")
+            return
+        }
+
+        // Show notifications for new messages
+        for message in newMessages {
+            print("🔔 [Background] Showing notification for: \(message.senderName)")
+            await notificationService.showForegroundNotification(
+                from: message.senderName,
+                message: message.text,
+                conversationId: conversationId,
+                senderImageURL: message.senderPhotoURL
+            )
+        }
     }
 
     // MARK: - Message Merging
@@ -478,7 +505,7 @@ class MessageService: ObservableObject {
 
         // Show in-app notifications ONLY if user is NOT viewing this conversation
         // This prevents duplicates: FCM handles background, we handle foreground for other conversations
-        if !newMessages.isEmpty && currentConversationId != conversationId {
+        if !newMessages.isEmpty && activeConversationId != conversationId {
             await showForegroundNotifications(newMessages, conversationId: conversationId)
         }
 
@@ -500,7 +527,7 @@ class MessageService: ObservableObject {
         print("🔔 [DEBUG] showForegroundNotifications called")
         print("   - New messages count: \(newMessages.count)")
         print("   - Conversation ID: \(conversationId)")
-        print("   - Current conversation ID: \(currentConversationId ?? "nil")")
+        print("   - Active conversation ID: \(activeConversationId ?? "nil")")
         print("   - NotificationService available: \(notificationService != nil)")
 
         guard let notificationService = notificationService else {
@@ -509,7 +536,7 @@ class MessageService: ObservableObject {
         }
 
         // Only show if NOT currently viewing this conversation
-        guard currentConversationId != conversationId else {
+        guard activeConversationId != conversationId else {
             print("📱 User is viewing \(conversationId) - suppressing notification (CORRECT)")
             return
         }
