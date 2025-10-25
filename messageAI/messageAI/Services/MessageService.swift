@@ -438,51 +438,25 @@ class MessageService: ObservableObject {
         }
     }
 
-    /// Check for new messages and show notifications if needed
+    /// Track seen messages to avoid duplicate processing
+    /// Note: Notifications are now handled entirely by FCM via backend Cloud Functions
+    /// This tracking is kept for future features that may need to detect new messages
     private var lastSeenMessageIds: [String: Set<String>] = [:]
 
     private func checkForNotifications(messages: [Message], conversationId: String) async {
-        guard let notificationService = notificationService else {
-            return
-        }
-
         // Initialize tracking for this conversation if needed
         if lastSeenMessageIds[conversationId] == nil {
             lastSeenMessageIds[conversationId] = Set(messages.map { $0.id })
-            return // Don't show notifications on initial load
+            return
         }
 
-        let previousMessageIds = lastSeenMessageIds[conversationId] ?? Set()
         let currentMessageIds = Set(messages.map { $0.id })
-
-        // Find new message IDs
-        let newMessageIds = currentMessageIds.subtracting(previousMessageIds)
-
-        // Get the actual new messages
-        let newMessages = messages.filter { message in
-            newMessageIds.contains(message.id) &&
-            message.senderId != currentUserId
-        }
 
         // Update tracking
         lastSeenMessageIds[conversationId] = currentMessageIds
 
-        // Only show notifications if this is NOT the active conversation
-        guard activeConversationId != conversationId else {
-            print("📱 Suppressing notification - user is viewing \(conversationId)")
-            return
-        }
-
-        // Show notifications for new messages
-        for message in newMessages {
-            print("🔔 Showing background notification for: \(message.senderName)")
-            await notificationService.showForegroundNotification(
-                from: message.senderName,
-                message: message.text,
-                conversationId: conversationId,
-                senderImageURL: message.senderPhotoURL
-            )
-        }
+        // Notifications are handled by FCM push notifications from backend
+        // No need to show in-app notifications here to avoid duplicates
     }
 
     // MARK: - Message Merging
@@ -490,22 +464,10 @@ class MessageService: ObservableObject {
     private func mergeMessages(_ remoteMessages: [Message], conversationId: String) async {
         print("🔄 Merging: local=\(messages.count), remote=\(remoteMessages.count)")
 
-        // Detect new messages for notifications (only from others)
-        let existingMessageIds = Set(messages.map { $0.id })
-        let newMessages = remoteMessages.filter { message in
-            !existingMessageIds.contains(message.id) &&
-            message.senderId != currentUserId
-        }
-
         // Firestore is the source of truth - use remote data directly
         messages = remoteMessages.sorted { $0.timestamp < $1.timestamp }
 
         print("✅ Merged result: \(messages.count) messages")
-
-        // Show notifications for new messages (only when not in this conversation)
-        if !newMessages.isEmpty {
-            await showNotificationsForNewMessages(newMessages, conversationId: conversationId)
-        }
 
         // Cache to local storage (async, non-blocking)
         Task { @MainActor in
@@ -517,34 +479,6 @@ class MessageService: ObservableObject {
                 }
             }
             print("💾 Cached \(remoteMessages.count) messages locally")
-        }
-    }
-
-    /// Show foreground notifications for new messages
-    private func showNotificationsForNewMessages(_ newMessages: [Message], conversationId: String) async {
-        guard let notificationService = notificationService else {
-            print("⚠️ NotificationService not available")
-            return
-        }
-
-        // Only show notification if NOT currently viewing this conversation
-        // Check if this is the active conversation being viewed
-        let isCurrentConversation = currentConversationId == conversationId
-
-        if isCurrentConversation {
-            print("📱 User is viewing conversation \(conversationId) - skipping notification")
-            return
-        }
-
-        // Show notifications for messages from other conversations
-        for message in newMessages {
-            print("🔔 Showing notification for message from \(message.senderName)")
-            await notificationService.showForegroundNotification(
-                from: message.senderName,
-                message: message.text,
-                conversationId: conversationId,
-                senderImageURL: message.senderPhotoURL
-            )
         }
     }
 
