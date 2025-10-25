@@ -74,10 +74,11 @@ struct ConversationRowView: View {
                 }
             }
 
-            Spacer(minLength: UIStyleGuide.Spacing.sm)
+            Spacer(minLength: UIStyleGuide.Spacing.md)
         }
         .padding(.vertical, UIStyleGuide.Spacing.sm)
-        .padding(.horizontal, UIStyleGuide.Spacing.md)
+        .padding(.leading, UIStyleGuide.Spacing.md)
+        .padding(.trailing, UIStyleGuide.Spacing.sm)
         .background(Color.white)
         .contentShape(Rectangle())
     }

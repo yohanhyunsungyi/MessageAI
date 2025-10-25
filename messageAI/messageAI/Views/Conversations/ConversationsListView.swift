@@ -275,8 +275,9 @@ struct ConversationsListView: View {
                         .fill(Color.black)
                         .frame(width: 56, height: 56)
 
-                    Text("⚡")
-                        .font(.system(size: 28))
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
                 }
 
                 // Content
