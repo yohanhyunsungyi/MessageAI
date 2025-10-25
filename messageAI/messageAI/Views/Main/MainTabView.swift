@@ -20,7 +20,27 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Conversations Tab
-            ConversationsListView(conversationsViewModel: conversationsViewModel)
+            if let viewModel = conversationsViewModel {
+                ConversationsListView(conversationsViewModel: viewModel)
+                    .tabItem {
+                        VStack {
+                            Image(systemName: selectedTab == 0 ? "message.fill" : "message")
+                                .font(.system(size: UIStyleGuide.IconSize.medium))
+                            Text("Chats")
+                                .font(UIStyleGuide.Typography.caption)
+                        }
+                    }
+                    .tag(0)
+            } else {
+                // Show loading while ViewModel initializes
+                VStack {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading conversations...")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.top)
+                }
                 .tabItem {
                     VStack {
                         Image(systemName: selectedTab == 0 ? "message.fill" : "message")
@@ -30,6 +50,7 @@ struct MainTabView: View {
                     }
                 }
                 .tag(0)
+            }
 
             // Users Tab
             UsersListView()

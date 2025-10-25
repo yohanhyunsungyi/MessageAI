@@ -30,12 +30,12 @@ struct ConversationsListView: View {
 
     // MARK: - Injected ViewModel (from MainTabView for global monitoring)
 
-    private let conversationsViewModel: ConversationsViewModel?
+    @ObservedObject private var conversationsViewModel: ConversationsViewModel
 
     // MARK: - Initialization
 
-    init(conversationsViewModel: ConversationsViewModel? = nil) {
-        self.conversationsViewModel = conversationsViewModel
+    init(conversationsViewModel: ConversationsViewModel) {
+        self._conversationsViewModel = ObservedObject(wrappedValue: conversationsViewModel)
     }
 
     // MARK: - Body
@@ -87,13 +87,13 @@ struct ConversationsListView: View {
                     SmartSearchView()
                 }
                 .refreshable {
-                    await conversationsViewModel?.refresh()
+                    await conversationsViewModel.refresh()
                 }
                 .navigationDestination(for: String.self) { conversationId in
                     ChatView(
                         conversationId: conversationId,
                         localStorageService: LocalStorageService(modelContext: modelContext),
-                        sharedMessageService: conversationsViewModel?.getSharedMessageService()
+                        sharedMessageService: conversationsViewModel.getSharedMessageService()
                     )
                 }
                 .sheet(isPresented: $showCreateGroup) {
@@ -119,10 +119,10 @@ struct ConversationsListView: View {
                 }
                 .alert("Error", isPresented: $showError) {
                     Button("OK") {
-                        conversationsViewModel?.clearError()
+                        conversationsViewModel.clearError()
                     }
                 } message: {
-                    if let error = conversationsViewModel?.errorMessage {
+                    if let error = conversationsViewModel.errorMessage {
                         Text(error)
                     }
                 }
@@ -132,7 +132,7 @@ struct ConversationsListView: View {
                         hasSetup = true
                     }
                 }
-                .onChange(of: conversationsViewModel?.errorMessage) { _, newValue in
+                .onChange(of: conversationsViewModel.errorMessage) { _, newValue in
                     showError = newValue != nil
                 }
                 .onReceive(NotificationCenter.default.publisher(
@@ -153,11 +153,7 @@ struct ConversationsListView: View {
             UIStyleGuide.Colors.background
                 .ignoresSafeArea()
 
-            if let viewModel = conversationsViewModel {
-                contentView(viewModel: viewModel)
-            } else {
-                loadingView
-            }
+            contentView(viewModel: conversationsViewModel)
         }
     }
 
@@ -175,8 +171,8 @@ struct ConversationsListView: View {
 
     private var searchTextBinding: Binding<String> {
         Binding(
-            get: { conversationsViewModel?.searchText ?? "" },
-            set: { conversationsViewModel?.searchText = $0 }
+            get: { conversationsViewModel.searchText },
+            set: { conversationsViewModel.searchText = $0 }
         )
     }
 
@@ -318,7 +314,21 @@ struct ConversationsListView: View {
 // MARK: - Preview
 
 #Preview {
-    ConversationsListView()
-        .environmentObject(AuthService())
+    let authService = AuthService()
+    let notificationService = NotificationService()
+    let localStorageService = LocalStorageService()
+    let conversationService = ConversationService(
+        localStorageService: localStorageService,
+        notificationService: notificationService
+    )
+    let viewModel = ConversationsViewModel(
+        conversationService: conversationService,
+        authService: authService,
+        notificationService: notificationService
+    )
+
+    return ConversationsListView(conversationsViewModel: viewModel)
+        .environmentObject(authService)
+        .environmentObject(notificationService)
         .modelContainer(for: [LocalMessage.self, LocalConversation.self])
 }
