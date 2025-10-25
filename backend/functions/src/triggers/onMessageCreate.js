@@ -7,6 +7,7 @@
 const { generateEmbedding, prepareMessageForEmbedding } = require("../ai/embeddings");
 const { upsertMessageEmbedding } = require("../ai/pinecone");
 const { classifyMessagePriority } = require("../features/priority");
+const { extractActionItemsFromPriorityMessage } = require("../features/priorityActionItems");
 
 /**
  * Index message in Pinecone when created
@@ -100,6 +101,15 @@ async function classifyPriority(messageData, context, messageRef) {
       });
 
       console.log(`   ✅ Priority updated in Firestore`);
+
+      // Automatically extract action items from high/critical priority messages
+      console.log(`   📋 Auto-extracting action items from priority message...`);
+      extractActionItemsFromPriorityMessage(
+          { ...messageData, id: context.params.messageId },
+          context.params.conversationId,
+      ).catch((error) => {
+        console.error(`   ⚠️ Action item extraction failed: ${error.message}`);
+      });
     } else {
       // For normal priority, still mark as classified but don't trigger notifications
       await messageRef.update({
