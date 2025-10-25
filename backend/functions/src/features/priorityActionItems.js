@@ -11,9 +11,10 @@ const { EXTRACT_ACTION_ITEMS_SCHEMA } = require("../ai/tools");
  * Extract action items from a single priority message
  * @param {Object} message - The priority message
  * @param {string} conversationId - Conversation ID
+ * @param {string} conversationName - Conversation name for display
  * @return {Promise<Array>} Extracted action items
  */
-async function extractActionItemsFromPriorityMessage(message, conversationId) {
+async function extractActionItemsFromPriorityMessage(message, conversationId, conversationName = "") {
   try {
     console.log(`📋 Extracting action items from priority message: ${message.text.substring(0, 50)}...`);
 
@@ -61,7 +62,7 @@ Identify any tasks, TODOs, or action items that need to be done.`;
     }
 
     const result = JSON.parse(functionCall.arguments);
-    const actionItems = result.action_items || [];
+    const actionItems = result.actionItems || []; // Match schema: actionItems (camelCase)
 
     if (actionItems.length === 0) {
       console.log(`   ℹ️ No action items found in message`);
@@ -82,9 +83,10 @@ Identify any tasks, TODOs, or action items that need to be done.`;
       const actionItemData = {
         id: actionItemRef.id,
         conversationId: conversationId,
+        conversationName: conversationName || "Unknown Conversation",
         description: item.description || "",
-        assignee: item.assignee || null,
-        deadline: item.deadline || null,
+        assignee: item.assignee || "unassigned",
+        deadline: item.deadline || "none",
         priority: item.priority || "medium",
         status: "pending",
         extractedAt: admin.firestore.FieldValue.serverTimestamp(),

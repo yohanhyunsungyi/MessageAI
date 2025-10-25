@@ -59,7 +59,7 @@ struct MainTabView: View {
             DecisionsListView()
                 .tabItem {
                     VStack {
-                        Image(systemName: selectedTab == 3 ? "checkmark.seal.fill" : "checkmark.seal")
+                        Image(systemName: selectedTab == 3 ? "lightbulb.fill" : "lightbulb")
                             .font(.system(size: UIStyleGuide.IconSize.medium))
                         Text("Decisions")
                             .font(UIStyleGuide.Typography.caption)

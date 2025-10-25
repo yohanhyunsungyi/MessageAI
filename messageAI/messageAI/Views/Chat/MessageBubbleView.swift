@@ -41,21 +41,13 @@ struct MessageBubbleView: View {
                 }
 
                 VStack(alignment: alignment, spacing: 4) {
-                    // Priority indicator + Message bubble
-                    HStack(spacing: 4) {
-                        if !isFromCurrentUser, let priority = message.priority, priority != .normal {
-                            Text(priority.emoji)
-                                .font(.system(size: 12))
-                        }
-
-                        messageBubble
-                            .clipShape(BubbleShape(isFromCurrentUser: isFromCurrentUser, position: position))
-
-                        if isFromCurrentUser, let priority = message.priority, priority != .normal {
-                            Text(priority.emoji)
-                                .font(.system(size: 12))
-                        }
-                    }
+                    // Message bubble with priority border
+                    messageBubble
+                        .clipShape(BubbleShape(isFromCurrentUser: isFromCurrentUser, position: position))
+                        .overlay(
+                            BubbleShape(isFromCurrentUser: isFromCurrentUser, position: position)
+                                .stroke(priorityBorderColor, lineWidth: priorityBorderWidth)
+                        )
 
                     // Timestamp and status
                     if showTimestamp {
@@ -86,6 +78,30 @@ struct MessageBubbleView: View {
 
     private var alignment: HorizontalAlignment {
         isFromCurrentUser ? .trailing : .leading
+    }
+
+    private var priorityBorderColor: Color {
+        guard let priority = message.priority, priority != .normal else {
+            return .clear
+        }
+
+        switch priority {
+        case .critical:
+            // Red border with opacity
+            return Color(red: 0.95, green: 0.26, blue: 0.21).opacity(0.7) // #F24336 @ 70%
+        case .high:
+            // Orange border with opacity
+            return Color(red: 1.0, green: 0.60, blue: 0.0).opacity(0.7) // #FF9800 @ 70%
+        case .normal:
+            return .clear
+        }
+    }
+
+    private var priorityBorderWidth: CGFloat {
+        guard let priority = message.priority, priority != .normal else {
+            return 0
+        }
+        return 0.5 // Subtle, thin border
     }
 
     // MARK: - Message Bubble

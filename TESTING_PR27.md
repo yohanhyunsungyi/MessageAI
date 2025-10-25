@@ -220,7 +220,7 @@ Note: Tests not yet implemented, but the function is production-ready.
 When a **high** or **critical** priority message is detected, the system automatically:
 1. Analyzes the message for actionable tasks
 2. Extracts structured action items (description, assignee, deadline)
-3. Saves them to Firestore under `conversations/{id}/actionItems`
+3. Saves them to Firestore root `actionItems` collection
 4. Makes them visible in the Action Items tab
 
 ### Test This Feature
@@ -244,14 +244,18 @@ John should review the auth code and deploy the patch ASAP."
 3. Items should have `createdFrom: "priority-message"` metadata
 
 **Check Firestore:**
-- Go to: `conversations/{conversationId}/actionItems`
+- Go to: `actionItems` (root collection)
 - New documents should appear with:
+  - `conversationId`: Source conversation ID
+  - `conversationName`: Display name of conversation
   - `description`: Task description
-  - `assignee`: Detected from message (or null)
+  - `assignee`: Detected from message or "unassigned"
+  - `deadline`: Detected deadline or "none"
   - `priority`: "high", "medium", or "low"
   - `status`: "pending"
   - `sourceMessageId`: ID of the priority message
   - `createdFrom`: "priority-message"
+  - `extractedBy`: "ai"
 
 **Performance:**
 - Action item extraction runs in background (non-blocking)

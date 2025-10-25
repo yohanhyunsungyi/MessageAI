@@ -34,12 +34,10 @@ struct ActionItemRowView: View {
                 // Metadata row
                 HStack(spacing: 12) {
                     // Priority indicator
-                    HStack(spacing: 4) {
-                        Text(actionItem.priority.emoji)
-                        Text(actionItem.priority.rawValue.capitalized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    Text(actionItem.priority.rawValue.capitalized)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(priorityColor(for: actionItem.priority))
 
                     // Assignee
                     if actionItem.assignee != "unassigned" {
@@ -71,6 +69,22 @@ struct ActionItemRowView: View {
             }
         }
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Helper Methods
+
+    private func priorityColor(for priority: ActionItem.Priority) -> Color {
+        switch priority {
+        case .high:
+            // Orange matching message border
+            return Color(red: 1.0, green: 0.60, blue: 0.0) // #FF9800
+        case .medium:
+            // Yellow/amber
+            return Color(red: 1.0, green: 0.76, blue: 0.03) // #FFC107
+        case .low:
+            // Green
+            return Color(red: 0.30, green: 0.69, blue: 0.31) // #4CAF50
+        }
     }
 }
 

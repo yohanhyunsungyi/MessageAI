@@ -104,9 +104,10 @@ async function classifyPriority(messageData, context, messageRef) {
 
       // Automatically extract action items from high/critical priority messages
       console.log(`   📋 Auto-extracting action items from priority message...`);
-      extractActionItemsFromPriorityMessage(
+      await extractActionItemsFromPriorityMessage(
           { ...messageData, id: context.params.messageId },
           context.params.conversationId,
+          conversationName,
       ).catch((error) => {
         console.error(`   ⚠️ Action item extraction failed: ${error.message}`);
       });

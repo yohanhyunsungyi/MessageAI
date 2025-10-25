@@ -112,7 +112,7 @@ struct ChatView: View {
                                 .scaleEffect(0.8)
                                 .tint(Color.black)
                         } else {
-                            Image(systemName: "checkmark.seal")
+                            Image(systemName: "lightbulb")
                                 .foregroundColor(Color.black)
                                 .font(.system(size: 16, weight: .semibold))
                         }

@@ -60,7 +60,7 @@ struct DecisionsListView: View {
                     ProgressView("Loading decisions...")
                 } else if decisions.isEmpty {
                     VStack(spacing: 16) {
-                        Image(systemName: "checkmark.seal")
+                        Image(systemName: "lightbulb")
                             .font(.system(size: 60))
                             .foregroundColor(.secondary)
                         Text("No decisions tracked")
