@@ -16,6 +16,7 @@ enum UIStyleGuide {
     enum Colors {
         static let primary = Color(hex: "D4FF00")          // Lime yellow
         static let primaryDark = Color(hex: "B8E000")      // Darker lime
+        static let secondary = Color(hex: "5EC792")        // Teal/green (from congratulations popup)
         static let background = Color.white
         static let cardBackground = Color(hex: "F8F8F8")
         static let textPrimary = Color.black

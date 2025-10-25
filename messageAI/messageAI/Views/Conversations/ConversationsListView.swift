@@ -269,19 +269,10 @@ struct ConversationsListView: View {
             AIAssistantChatView()
         } label: {
             HStack(spacing: UIStyleGuide.Spacing.md) {
-                // AI Icon
+                // AI Icon - Lucid logo style (black circle with white lightning)
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.purple.opacity(0.8),
-                                    Color.blue.opacity(0.8)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(Color.black)
                         .frame(width: 56, height: 56)
 
                     Text("⚡")
@@ -290,13 +281,9 @@ struct ConversationsListView: View {
 
                 // Content
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("AI Assistant")
-                            .font(UIStyleGuide.Typography.bodyBold)
-                            .foregroundColor(UIStyleGuide.Colors.textPrimary)
-
-                        Spacer()
-                    }
+                    Text("AI Assistant")
+                        .font(UIStyleGuide.Typography.bodyBold)
+                        .foregroundColor(UIStyleGuide.Colors.textPrimary)
 
                     Text("Ask me anything about your conversations")
                         .font(UIStyleGuide.Typography.caption)
@@ -304,18 +291,12 @@ struct ConversationsListView: View {
                         .lineLimit(1)
                 }
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(UIStyleGuide.Colors.textTertiary)
+                Spacer()
             }
             .padding(UIStyleGuide.Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.blue.opacity(0.2), lineWidth: 1.5)
-                    )
+                    .fill(UIStyleGuide.Colors.primary)
             )
             .padding(.horizontal, UIStyleGuide.Spacing.md)
             .padding(.vertical, UIStyleGuide.Spacing.xs)

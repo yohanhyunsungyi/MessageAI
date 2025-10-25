@@ -132,7 +132,7 @@ struct AIAssistantChatView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 16)
                             .fill(message.isFromUser ?
-                                  Color.blue :
+                                  UIStyleGuide.Colors.secondary :
                                   Color.white)
                     )
                     .overlay(
@@ -171,10 +171,10 @@ struct AIAssistantChatView: View {
                     HStack {
                         Text(prompt)
                             .font(UIStyleGuide.Typography.bodySmall)
-                            .foregroundColor(Color.blue)
+                            .foregroundColor(UIStyleGuide.Colors.secondary)
                         Spacer()
                         Image(systemName: "arrow.up.circle.fill")
-                            .foregroundColor(Color.blue)
+                            .foregroundColor(UIStyleGuide.Colors.secondary)
                     }
                     .padding(.horizontal, UIStyleGuide.Spacing.md)
                     .padding(.vertical, UIStyleGuide.Spacing.sm)
@@ -183,7 +183,7 @@ struct AIAssistantChatView: View {
                             .fill(Color.white)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(Color.blue.opacity(0.3), lineWidth: 1)
+                                    .strokeBorder(UIStyleGuide.Colors.secondary.opacity(0.3), lineWidth: 1)
                             )
                     )
                 }
@@ -212,7 +212,7 @@ struct AIAssistantChatView: View {
             } label: {
                 Image(systemName: canSend ? "arrow.up.circle.fill" : "arrow.up.circle")
                     .font(.system(size: 32))
-                    .foregroundColor(canSend ? Color.blue : UIStyleGuide.Colors.textTertiary)
+                    .foregroundColor(canSend ? UIStyleGuide.Colors.secondary : UIStyleGuide.Colors.textTertiary)
             }
             .disabled(!canSend)
         }

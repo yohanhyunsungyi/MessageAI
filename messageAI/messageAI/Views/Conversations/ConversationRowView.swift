@@ -73,6 +73,8 @@ struct ConversationRowView: View {
                     }
                 }
             }
+
+            Spacer(minLength: UIStyleGuide.Spacing.sm)
         }
         .padding(.vertical, UIStyleGuide.Spacing.sm)
         .padding(.horizontal, UIStyleGuide.Spacing.md)
