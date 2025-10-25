@@ -180,64 +180,159 @@ See [TESTING_NOTES.md](TESTING_NOTES.md) for comprehensive testing documentation
 
 ```
 MessageAI/
-├── messageAI/                          # iOS App
-│   ├── messageAI.xcodeproj            # Xcode project
-│   ├── messageAI/                     # Source code
-│   │   ├── messageAIApp.swift         # App entry point
-│   │   ├── Services/                  # Business logic layer
-│   │   │   ├── FirebaseManager.swift
-│   │   │   ├── MessageService.swift
-│   │   │   ├── ConversationService.swift
-│   │   │   ├── AIService.swift        # AI features wrapper
-│   │   │   ├── AuthService.swift
-│   │   │   └── LocalStorageService.swift
-│   │   ├── ViewModels/                # State management
-│   │   ├── Views/                     # SwiftUI views
-│   │   │   ├── Chat/
-│   │   │   │   ├── ChatView.swift
-│   │   │   │   └── SummaryView.swift  # AI summaries
-│   │   │   ├── Conversations/
+├── messageAI/                                    # iOS App
+│   ├── messageAI.xcodeproj                      # Xcode project
+│   ├── messageAI/                               # Source code
+│   │   ├── messageAIApp.swift                   # App entry point
+│   │   │
+│   │   ├── Services/                            # Business logic layer
+│   │   │   ├── FirebaseManager.swift            # Firebase singleton
+│   │   │   ├── AuthService.swift                # Authentication
+│   │   │   ├── UserService.swift                # User management
+│   │   │   ├── MessageService.swift             # Message CRUD (local-first)
+│   │   │   ├── ConversationService.swift        # Conversation management
+│   │   │   ├── PresenceService.swift            # Online/offline status
+│   │   │   ├── NotificationService.swift        # FCM push notifications
+│   │   │   ├── LocalStorageService.swift        # SwiftData wrapper
+│   │   │   ├── AIService.swift                  # AI features wrapper
+│   │   │   ├── AIAssistantService.swift         # Chat assistant
+│   │   │   └── ProactiveAssistantService.swift  # Proactive scheduling
+│   │   │
+│   │   ├── ViewModels/                          # State management (@MainActor)
+│   │   │   ├── AuthViewModel.swift
+│   │   │   ├── UsersViewModel.swift
+│   │   │   ├── ConversationsViewModel.swift
+│   │   │   └── ChatViewModel.swift
+│   │   │
+│   │   ├── Views/                               # SwiftUI views
+│   │   │   ├── Main/
+│   │   │   │   └── MainTabView.swift            # Tab navigation
+│   │   │   ├── Auth/
+│   │   │   │   ├── SignInView.swift
+│   │   │   │   └── SignUpView.swift
+│   │   │   ├── Onboarding/
+│   │   │   │   └── OnboardingView.swift
 │   │   │   ├── Users/
-│   │   │   └── Auth/
-│   │   ├── Models/                    # Firebase models
+│   │   │   │   └── UsersListView.swift
+│   │   │   ├── Conversations/
+│   │   │   │   ├── ConversationsListView.swift
+│   │   │   │   └── ConversationRowView.swift
+│   │   │   ├── Chat/
+│   │   │   │   ├── ChatView.swift               # Main chat UI
+│   │   │   │   ├── MessageBubbleView.swift
+│   │   │   │   └── SummaryView.swift            # AI summary sheet
+│   │   │   ├── AIAssistant/
+│   │   │   │   └── AIAssistantChatView.swift    # ⚡ Chat assistant
+│   │   │   ├── ActionItems/
+│   │   │   │   ├── ActionItemsListView.swift    # Tasks tab
+│   │   │   │   └── ActionItemRowView.swift
+│   │   │   ├── Decisions/
+│   │   │   │   ├── DecisionsListView.swift      # Decisions timeline
+│   │   │   │   └── DecisionDetailView.swift
+│   │   │   ├── Search/
+│   │   │   │   └── SmartSearchView.swift        # RAG search
+│   │   │   ├── Proactive/
+│   │   │   │   └── ProactiveSuggestionView.swift # Scheduling cards
+│   │   │   └── Profile/
+│   │   │       └── ProfileView.swift
+│   │   │
+│   │   ├── Models/                              # Firebase data models
+│   │   │   ├── User.swift
 │   │   │   ├── Message.swift
 │   │   │   ├── Conversation.swift
-│   │   │   ├── User.swift
-│   │   │   └── Summary.swift          # AI summary model
-│   │   ├── LocalModels/               # SwiftData models
-│   │   └── GoogleService-Info.plist   # Firebase config (not in git)
-│   ├── messageAITests/                # Unit & Integration tests
-│   └── messageAIUITests/              # UI tests
-├── backend/                           # Firebase Cloud Functions
+│   │   │   ├── ConversationType.swift
+│   │   │   ├── MessageStatus.swift
+│   │   │   ├── MessagePriority.swift            # AI priority enum
+│   │   │   ├── Summary.swift                    # AI summary model
+│   │   │   ├── ActionItem.swift                 # AI action item
+│   │   │   ├── Decision.swift                   # AI decision
+│   │   │   ├── ProactiveSuggestion.swift        # AI scheduling
+│   │   │   └── SearchResult.swift               # RAG result
+│   │   │
+│   │   ├── LocalModels/                         # SwiftData models
+│   │   │   ├── LocalMessage.swift
+│   │   │   └── LocalConversation.swift
+│   │   │
+│   │   ├── Utils/                               # Helpers & extensions
+│   │   │   ├── Constants.swift
+│   │   │   ├── UIStyleGuide.swift
+│   │   │   └── Extensions.swift
+│   │   │
+│   │   └── GoogleService-Info.plist             # Firebase config (not in git)
+│   │
+│   ├── messageAITests/                          # Unit & Integration tests
+│   └── messageAIUITests/                        # UI tests
+│
+├── backend/                                     # Firebase Cloud Functions
 │   └── functions/
 │       ├── src/
-│       │   ├── ai/                    # AI infrastructure
-│       │   │   ├── openai.js          # OpenAI client
-│       │   │   ├── pinecone.js        # Pinecone vector DB
-│       │   │   ├── embeddings.js      # Embedding generation
-│       │   │   ├── prompts.js         # AI prompts
-│       │   │   └── tools.js           # Function calling schemas
-│       │   ├── features/              # AI features
-│       │   │   ├── summarization.js   # Thread summarization
-│       │   │   ├── vectorSearch.js    # Smart search (RAG)
-│       │   │   ├── actionItems.js     # Action extraction
-│       │   │   └── priority.js        # Priority detection
-│       │   ├── triggers/              # Firestore triggers
-│       │   │   └── onMessageCreate.js # Message indexing
-│       │   ├── middleware/            # Rate limiting, auth
-│       │   └── __tests__/             # Cloud Function tests
-│       ├── index.js                   # Function exports
-│       ├── package.json
-│       └── .env.example               # Environment template
-├── firebase.json                      # Firebase configuration
-├── firestore.rules                    # Firestore security rules
-├── firestore.indexes.json             # Firestore indexes
-├── Architecture.md                    # Architecture documentation
-├── PRD.md                            # Product requirements (AI features)
-├── Tasks_final.md                    # AI features task breakdown
-├── Tasks_MVP.md                      # MVP task list
-├── TESTING_NOTES.md                  # Testing documentation
-└── README.md                         # This file
+│       │   ├── ai/                              # AI infrastructure
+│       │   │   ├── openai.js                    # OpenAI GPT-4o-mini client
+│       │   │   ├── pinecone.js                  # Pinecone vector DB client
+│       │   │   ├── embeddings.js                # text-embedding-3-small
+│       │   │   ├── prompts.js                   # Prompt templates
+│       │   │   └── tools.js                     # Function calling schemas
+│       │   │
+│       │   ├── features/                        # AI features implementation
+│       │   │   ├── summarization.js             # Thread summarization
+│       │   │   ├── actionItems.js               # Action item extraction
+│       │   │   ├── priorityActionItems.js       # Priority + action items
+│       │   │   ├── vectorSearch.js              # Smart search (RAG)
+│       │   │   ├── priority.js                  # Priority detection
+│       │   │   ├── decisions.js                 # Decision tracking
+│       │   │   ├── nlCommands.js                # Natural language commands
+│       │   │   └── proactive/
+│       │   │       ├── detection.js             # Scheduling detection
+│       │   │       ├── timeSlots.js             # Timezone-aware slots
+│       │   │       └── confirmSuggestion.js     # Confirmation handler
+│       │   │
+│       │   ├── triggers/                        # Firestore triggers
+│       │   │   └── onMessageCreate.js           # Auto-indexing, priority
+│       │   │
+│       │   ├── utils/                           # Helper utilities
+│       │   │   └── contextRetrieval.js          # RAG context logic
+│       │   │
+│       │   ├── middleware/                      # Express middleware
+│       │   │   └── rateLimit.js                 # Rate limiting
+│       │   │
+│       │   ├── scripts/                         # Admin scripts
+│       │   │   └── backfillEmbeddings.js        # Historical indexing
+│       │   │
+│       │   └── __tests__/                       # Jest tests
+│       │       ├── openai.test.js
+│       │       ├── pinecone.test.js
+│       │       ├── embeddings.test.js
+│       │       ├── summarization.test.js
+│       │       ├── vectorSearch.test.js
+│       │       └── timeSlots.test.js
+│       │
+│       ├── index.js                             # Function exports (11 functions)
+│       ├── package.json                         # Dependencies
+│       ├── .env.example                         # Environment template
+│       └── AI_SETUP.md                          # AI setup guide
+│
+├── docs/                                        # Documentation
+│   ├── AI_ARCHITECTURE.md                       # AI technical architecture
+│   └── API.md                                   # Cloud Functions API reference
+│
+├── firebase.json                                # Firebase project config
+├── firestore.rules                              # Firestore security rules
+├── firestore.indexes.json                       # Composite indexes
+├── .firebaserc                                  # Firebase project aliases
+│
+├── Architecture.md                              # Full architecture diagram (Mermaid)
+├── PRD.md                                       # Product requirements (1160 lines)
+├── PERSONA_BRAINLIFT.md                         # Target persona analysis
+├── Tasks_final.md                               # AI features PRs (15 PRs)
+├── Tasks_MVP.md                                 # MVP PRs (21 PRs)
+├── TESTING_NOTES.md                             # Testing guide
+├── CLAUDE.md                                    # Claude Code guidelines
+├── README.md                                    # This file
+│
+└── scripts/                                     # Helper scripts
+    ├── complete-reset.sh                        # Reset Firestore + simulator
+    ├── reset-simulator.sh                       # iOS simulator reset
+    └── deploy-notifications.sh                  # Deploy FCM functions
 ```
 
 ## 🧪 Testing
