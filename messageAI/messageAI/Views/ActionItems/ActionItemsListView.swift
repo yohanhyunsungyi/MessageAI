@@ -9,7 +9,7 @@ import SwiftUI
 import FirebaseFirestore
 
 struct ActionItemsListView: View {
-    @StateObject private var firebaseManager = FirebaseManager.shared
+    private let firebaseManager = FirebaseManager.shared
     @State private var actionItems: [ActionItem] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
