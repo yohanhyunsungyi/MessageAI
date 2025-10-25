@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import Combine
 
 /// List view displaying all conversations
 struct ConversationsListView: View {
@@ -23,7 +22,6 @@ struct ConversationsListView: View {
     @State private var hasSetup = false
     @State private var conversationService: ConversationService?
     @State private var usersViewModel: UsersViewModel?
-    @StateObject private var vmWrapper = ConversationsViewModelWrapper()
     @State private var showError = false
     @State private var showCreateGroup = false
     @State private var navigationPath = NavigationPath()
@@ -32,16 +30,12 @@ struct ConversationsListView: View {
 
     // MARK: - Injected ViewModel (from MainTabView for global monitoring)
 
-    private let injectedViewModel: ConversationsViewModel?
-
-    private var conversationsViewModel: ConversationsViewModel? {
-        injectedViewModel ?? vmWrapper.viewModel
-    }
+    private let conversationsViewModel: ConversationsViewModel?
 
     // MARK: - Initialization
 
     init(conversationsViewModel: ConversationsViewModel? = nil) {
-        self.injectedViewModel = conversationsViewModel
+        self.conversationsViewModel = conversationsViewModel
     }
 
     // MARK: - Body
@@ -304,69 +298,21 @@ struct ConversationsListView: View {
     // MARK: - Helper Methods
 
     private func setupViewModel() {
-        // If we have an injected ViewModel from MainTabView, use it for services
-        if let injectedVM = injectedViewModel {
-            // Extract the conversation service for group creation
-            // Note: We can't directly access private properties, so we'll create a new one
-            let localStorageService = LocalStorageService(modelContext: modelContext)
-            let service = ConversationService(
-                localStorageService: localStorageService,
-                notificationService: notificationService
-            )
-            conversationService = service
+        // Always use injected ViewModel from MainTabView (required for global monitoring)
+        // Create conversation service for group creation
+        let localStorageService = LocalStorageService(modelContext: modelContext)
+        let service = ConversationService(
+            localStorageService: localStorageService,
+            notificationService: notificationService
+        )
+        conversationService = service
 
-            // Initialize UsersViewModel for group creation
-            let userService = UserService()
-            usersViewModel = UsersViewModel(userService: userService)
+        // Initialize UsersViewModel for group creation
+        let userService = UserService()
+        usersViewModel = UsersViewModel(userService: userService)
 
-            print("📱 Using injected ConversationsViewModel with global monitoring")
-        } else {
-            // Fallback: Create local ViewModel (for previews or standalone usage)
-            let localStorageService = LocalStorageService(modelContext: modelContext)
-            let service = ConversationService(
-                localStorageService: localStorageService,
-                notificationService: notificationService
-            )
-            let viewModel = ConversationsViewModel(
-                conversationService: service,
-                authService: authService,
-                notificationService: notificationService
-            )
-
-            // Initialize UsersViewModel for group creation
-            let userService = UserService()
-            let usersVM = UsersViewModel(userService: userService)
-
-            // Update state
-            conversationService = service
-            usersViewModel = usersVM
-            vmWrapper.viewModel = viewModel
-
-            // Load data and start listening locally
-            Task {
-                await viewModel.loadConversations()
-                viewModel.startListening()
-            }
-
-            print("📱 Using local ConversationsViewModel")
-        }
+        print("📱 Using injected ConversationsViewModel with global monitoring")
     }
-}
-
-// MARK: - Wrapper
-
-@MainActor
-class ConversationsViewModelWrapper: ObservableObject {
-    @Published var viewModel: ConversationsViewModel? {
-        didSet {
-            // Forward ViewModel's objectWillChange to this wrapper
-            cancellable = viewModel?.objectWillChange.sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-        }
-    }
-
-    private var cancellable: AnyCancellable?
 }
 
 // MARK: - Preview
