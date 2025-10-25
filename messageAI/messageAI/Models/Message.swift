@@ -19,4 +19,6 @@ struct Message: Codable, Identifiable {
     var readBy: [String: Date]          // userId: readTimestamp
     var deliveredTo: [String: Date]     // userId: deliveredTimestamp
     var localId: String?                // For optimistic updates
+    var priority: MessagePriority?      // AI-classified priority
+    var aiClassified: Bool?             // Whether AI classification completed
 }

@@ -47,6 +47,12 @@ struct ConversationRowView: View {
 
                 // Last message and unread badge
                 HStack(spacing: UIStyleGuide.Spacing.sm) {
+                    // Priority indicator
+                    if let priority = conversation.lastMessagePriority, priority != .normal {
+                        Text(priority.emoji)
+                            .font(.system(size: 14))
+                    }
+
                     // Last message
                     Text(subtitle)
                         .font(UIStyleGuide.Typography.bodySmall)

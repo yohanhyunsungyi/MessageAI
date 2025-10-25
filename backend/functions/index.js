@@ -10,9 +10,11 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 // Import AI infrastructure
-const { indexMessageInPinecone } = require("./src/triggers/onMessageCreate");
+const { indexMessageInPinecone, classifyPriority } = require("./src/triggers/onMessageCreate");
 const { searchMessages } = require("./src/features/vectorSearch");
 const { summarizeConversation } = require("./src/features/summarization");
+const { extractActionItems } = require("./src/features/actionItems");
+const { extractDecisions } = require("./src/features/decisions");
 const { withRateLimit } = require("./src/middleware/rateLimit");
 
 /**
@@ -34,6 +36,12 @@ exports.sendMessageNotification = functions.firestore
         // Index message in Pinecone (non-blocking, best-effort)
         indexMessageInPinecone(message, context).catch((error) => {
           console.error(`⚠️ Background indexing failed: ${error.message}`);
+        });
+
+        // Classify message priority and extract action items (await to ensure completion)
+        // This must complete before function ends so action items are created
+        await classifyPriority(message, context, snap.ref).catch((error) => {
+          console.error(`⚠️ Priority classification failed: ${error.message}`);
         });
 
         // Get conversation to find recipients
@@ -79,12 +87,18 @@ exports.sendMessageNotification = functions.firestore
           return null;
         }
 
+        // Determine notification priority (will be set by AI classification)
+        const messagePriority = message.priority || "normal";
+        const isPriorityMessage = messagePriority === "critical" || messagePriority === "high";
+
         // Prepare notification payload
         const payload = {
           notification: {
-            title: message.senderName,
+            title: isPriorityMessage ?
+              `${messagePriority === "critical" ? "🔴" : "🟡"} ${message.senderName}` :
+              message.senderName,
             body: message.text,
-            sound: "default",
+            sound: isPriorityMessage ? "default" : "default", // Can use different sound for priority
           },
           data: {
             conversationId: conversationId,
@@ -93,6 +107,7 @@ exports.sendMessageNotification = functions.firestore
             senderId: message.senderId,
             senderName: message.senderName,
             senderPhotoURL: message.senderPhotoURL || "",
+            priority: messagePriority,
             click_action: "FLUTTER_NOTIFICATION_CLICK",
           },
           apns: {
@@ -102,6 +117,10 @@ exports.sendMessageNotification = functions.firestore
                 "sound": "default",
                 "content-available": 1,
                 "category": "MESSAGE_CATEGORY",
+                "alert": isPriorityMessage ? {
+                  "title": `${messagePriority === "critical" ? "🔴" : "🟡"} ${message.senderName}`,
+                  "body": message.text,
+                } : undefined,
               },
               // Add sender image URL for iOS notification attachment
               "sender-image": message.senderPhotoURL || "",
@@ -110,10 +129,13 @@ exports.sendMessageNotification = functions.firestore
         };
 
         // Send notification to all recipient tokens
-        console.log(`📤 Sending notifications to ${tokens.length} device(s)`);
+        console.log(`📤 Sending ${isPriorityMessage ? "PRIORITY " : ""}notifications to ${tokens.length} device(s)`);
+        if (isPriorityMessage) {
+          console.log(`   Priority: ${messagePriority.toUpperCase()}`);
+        }
 
         const response = await admin.messaging().sendToDevice(tokens, payload, {
-          priority: "high",
+          priority: isPriorityMessage ? "high" : "normal",
           timeToLive: 60 * 60 * 24, // 24 hours
         });
 
@@ -330,5 +352,101 @@ exports.summarizeConversation = functions.https.onCall(
         );
       }
     }, "summarization"),
+);
+
+/**
+ * Action Item Extraction
+ * Extract structured action items from conversation threads
+ * Call from iOS: functions.httpsCallable("extractActionItems").call({ conversationId: "...", messageLimit: 200 })
+ */
+exports.extractActionItems = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to extract action items",
+        );
+      }
+
+      const { conversationId, messageLimit } = data;
+
+      if (!conversationId || typeof conversationId !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "conversationId is required and must be a string",
+        );
+      }
+
+      console.log(`📋 Action item extraction request from user: ${context.auth.uid}`);
+      console.log(`   Conversation: ${conversationId}`);
+
+      try {
+        const result = await extractActionItems(
+            conversationId,
+            context.auth.uid,
+            messageLimit || 200,
+        );
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ Action item extraction error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to extract action items",
+        );
+      }
+    }, "action-items"),
+);
+
+/**
+ * Decision Tracking
+ * Extract key decisions from conversation threads
+ * Call from iOS: functions.httpsCallable("extractDecisions").call({ conversationId: "...", messageLimit: 200 })
+ */
+exports.extractDecisions = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to extract decisions",
+        );
+      }
+
+      const { conversationId, messageLimit } = data;
+
+      if (!conversationId || typeof conversationId !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "conversationId is required and must be a string",
+        );
+      }
+
+      console.log(`🎯 Decision extraction request from user: ${context.auth.uid}`);
+      console.log(`   Conversation: ${conversationId}`);
+
+      try {
+        const result = await extractDecisions(
+            conversationId,
+            context.auth.uid,
+            messageLimit || 200,
+        );
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ Decision extraction error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to extract decisions",
+        );
+      }
+    }, "decision-tracking"),
 );
 

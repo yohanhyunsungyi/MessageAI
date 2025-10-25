@@ -84,14 +84,19 @@ async function searchSimilarMessages(queryEmbedding, options = {}) {
     const index = getMessageIndex();
     const { topK = 5, conversationId } = options;
 
-    const filter = conversationId ? { conversationId: { $eq: conversationId } } : {};
-
-    const queryResponse = await index.query({
+    // Build query parameters - only include filter if conversationId is provided
+    const queryParams = {
       vector: queryEmbedding,
       topK: topK,
       includeMetadata: true,
-      filter: filter,
-    });
+    };
+
+    // Only add filter if conversationId is specified (Pinecone rejects empty filters)
+    if (conversationId) {
+      queryParams.filter = { conversationId: { $eq: conversationId } };
+    }
+
+    const queryResponse = await index.query(queryParams);
 
     return queryResponse.matches || [];
   } catch (error) {

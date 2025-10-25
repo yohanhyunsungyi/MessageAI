@@ -28,6 +28,7 @@ struct ConversationsListView: View {
     @State private var showCreateGroup = false
     @State private var navigationPath = NavigationPath()
     @State private var pendingNavigationConversationId: String?
+    @State private var showSmartSearch = false
 
     // MARK: - Injected ViewModel (from MainTabView for global monitoring)
 
@@ -51,6 +52,26 @@ struct ConversationsListView: View {
                 .navigationTitle("Messages")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showSmartSearch = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("AI Search")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(UIStyleGuide.Colors.primary)
+                            .clipShape(Capsule())
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
                             showCreateGroup = true
@@ -68,11 +89,9 @@ struct ConversationsListView: View {
                         .buttonBorderShape(.capsule)
                     }
                 }
-                .searchable(
-                    text: searchTextBinding,
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Search conversations"
-                )
+                .sheet(isPresented: $showSmartSearch) {
+                    SmartSearchView()
+                }
                 .refreshable {
                     await conversationsViewModel?.refresh()
                 }

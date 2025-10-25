@@ -1,10 +1,13 @@
 /**
  * Message Indexing Trigger
  * Automatically indexes new messages to Pinecone for semantic search
+ * Also classifies message priority in real-time
  */
 
 const { generateEmbedding, prepareMessageForEmbedding } = require("../ai/embeddings");
 const { upsertMessageEmbedding } = require("../ai/pinecone");
+const { classifyMessagePriority } = require("../features/priority");
+const { extractActionItemsFromPriorityMessage } = require("../features/priorityActionItems");
 
 /**
  * Index message in Pinecone when created
@@ -52,6 +55,77 @@ async function indexMessageInPinecone(messageData, context) {
   }
 }
 
+/**
+ * Classify message priority in real-time
+ * Updates message document with priority field
+ * @param {Object} messageData - Message document data
+ * @param {Object} context - Function context with params
+ * @param {Object} messageRef - Firestore reference to message
+ * @return {Promise<void>}
+ */
+async function classifyPriority(messageData, context, messageRef) {
+  try {
+    console.log(`🎯 Classifying priority for message: ${context.params.messageId}`);
+
+    // Get conversation context for better classification
+    const admin = require("firebase-admin");
+    let conversationName = "";
+    try {
+      const convSnap = await admin.firestore()
+          .collection("conversations")
+          .doc(context.params.conversationId)
+          .get();
+      if (convSnap.exists) {
+        const convData = convSnap.data();
+        // participantNames is an object { userId: name }, not an array
+        const participantNames = convData.participantNames || {};
+        const namesList = Object.values(participantNames);
+        conversationName = convData.name ||
+          (namesList.length > 0 ? namesList.join(", ") : "") ||
+          "";
+      }
+    } catch (err) {
+      console.log(`   ⚠️ Could not fetch conversation: ${err.message}`);
+    }
+
+    // Classify priority
+    const classification = await classifyMessagePriority(messageData, { conversationName });
+
+    // Update message with priority
+    if (classification.priority && (classification.priority === "critical" || classification.priority === "high")) {
+      console.log(`   🚨 High priority message detected: ${classification.priority}`);
+
+      await messageRef.update({
+        priority: classification.priority,
+        aiClassified: classification.aiClassified,
+      });
+
+      console.log(`   ✅ Priority updated in Firestore`);
+
+      // Automatically extract action items from high/critical priority messages
+      console.log(`   📋 Auto-extracting action items from priority message...`);
+      await extractActionItemsFromPriorityMessage(
+          { ...messageData, id: context.params.messageId },
+          context.params.conversationId,
+          conversationName,
+      ).catch((error) => {
+        console.error(`   ⚠️ Action item extraction failed: ${error.message}`);
+      });
+    } else {
+      // For normal priority, still mark as classified but don't trigger notifications
+      await messageRef.update({
+        priority: "normal",
+        aiClassified: classification.aiClassified,
+      });
+    }
+  } catch (error) {
+    // Log error but don't throw - priority classification is best-effort
+    console.error(`❌ Failed to classify priority:`, error);
+    console.error(`   Error: ${error.message}`);
+  }
+}
+
 module.exports = {
   indexMessageInPinecone,
+  classifyPriority,
 };
