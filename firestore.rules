@@ -61,6 +61,18 @@ service cloud.firestore {
       // No delete - use status field instead
       allow delete: if false;
     }
+
+    // Decisions collection
+    match /decisions/{decisionId} {
+      // Allow read for all authenticated users (can filter client-side)
+      allow read: if isSignedIn();
+      // Allow create only by Cloud Functions
+      allow create: if false;
+      // Allow update for authenticated users
+      allow update: if isSignedIn();
+      // No delete allowed
+      allow delete: if false;
+    }
   }
 }
 
