@@ -73,6 +73,20 @@ service cloud.firestore {
       // No delete allowed
       allow delete: if false;
     }
+
+    // Proactive Suggestions collection
+    match /proactiveSuggestions/{suggestionId} {
+      // Allow read for authenticated users who are participants
+      allow read: if isSignedIn() &&
+        request.auth.uid in resource.data.participantIds;
+      // Allow create only by Cloud Functions
+      allow create: if false;
+      // Allow update for authenticated users who are participants (to accept/dismiss)
+      allow update: if isSignedIn() &&
+        request.auth.uid in resource.data.participantIds;
+      // No delete allowed
+      allow delete: if false;
+    }
   }
 }
 

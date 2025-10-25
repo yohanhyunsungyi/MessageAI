@@ -8,6 +8,7 @@ const { generateEmbedding, prepareMessageForEmbedding } = require("../ai/embeddi
 const { upsertMessageEmbedding } = require("../ai/pinecone");
 const { classifyMessagePriority } = require("../features/priority");
 const { extractActionItemsFromPriorityMessage } = require("../features/priorityActionItems");
+const { handleSchedulingDetection } = require("../features/proactive/detection");
 
 /**
  * Index message in Pinecone when created
@@ -51,6 +52,26 @@ async function indexMessageInPinecone(messageData, context) {
     // Log error but don't throw - indexing is best-effort
     // Message should still be created even if indexing fails
     console.error(`❌ Failed to index message ${messageId}:`, error);
+    console.error(`   Error: ${error.message}`);
+  }
+}
+
+/**
+ * Detect scheduling needs in real-time
+ * Creates proactive suggestions when scheduling language detected
+ * @param {Object} messageData - Message document data
+ * @param {Object} context - Function context with params
+ * @return {Promise<void>}
+ */
+async function detectScheduling(messageData, context) {
+  try {
+    console.log(`📅 Detecting scheduling need for message: ${context.params.messageId}`);
+
+    // Call scheduling detection handler (non-blocking)
+    await handleSchedulingDetection(messageData, context);
+  } catch (error) {
+    // Log error but don't throw - scheduling detection is best-effort
+    console.error(`❌ Failed to detect scheduling:`, error);
     console.error(`   Error: ${error.message}`);
   }
 }
@@ -128,4 +149,5 @@ async function classifyPriority(messageData, context, messageRef) {
 module.exports = {
   indexMessageInPinecone,
   classifyPriority,
+  detectScheduling,
 };

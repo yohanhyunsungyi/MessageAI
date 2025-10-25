@@ -10,7 +10,7 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 // Import AI infrastructure
-const { indexMessageInPinecone, classifyPriority } = require("./src/triggers/onMessageCreate");
+const { indexMessageInPinecone, classifyPriority, detectScheduling } = require("./src/triggers/onMessageCreate");
 const { searchMessages } = require("./src/features/vectorSearch");
 const { summarizeConversation } = require("./src/features/summarization");
 const { extractActionItems } = require("./src/features/actionItems");
@@ -43,6 +43,11 @@ exports.sendMessageNotification = functions.firestore
         // This must complete before function ends so action items are created
         await classifyPriority(message, context, snap.ref).catch((error) => {
           console.error(`⚠️ Priority classification failed: ${error.message}`);
+        });
+
+        // Detect scheduling needs (non-blocking, best-effort)
+        detectScheduling(message, context).catch((error) => {
+          console.error(`⚠️ Scheduling detection failed: ${error.message}`);
         });
 
         // Get conversation to find recipients
