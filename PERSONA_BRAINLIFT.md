@@ -58,7 +58,7 @@
 - Get instant summary: "Key decisions: Migrated to PostgreSQL for better JSON support. Blockers: Need Redis cluster setup. Action items: @bob set up staging DB by Friday."
 - **Time Saved:** 10-15 minutes per long thread = 30-60 min/day
 
-**Technical Decision:** GPT-4 Turbo with custom prompt engineering focused on software team context (decisions, blockers, action items) rather than generic summaries.
+**Technical Decision:** GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo) with custom prompt engineering focused on software team context (decisions, blockers, action items) rather than generic summaries.
 
 ### 2. Smart Search (RAG) → Solves Lost Context
 
@@ -129,9 +129,9 @@
 
 **Trade-off:** More complex than pure client-side, but essential for production quality and security.
 
-### AI Provider: OpenAI GPT-4 Turbo
+### AI Provider: OpenAI GPT-4o-mini (2-5x faster, 60x cheaper)
 
-**Decision:** GPT-4 Turbo for all features (summarization, extraction, search, classification)
+**Decision:** GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo) for all features (summarization, extraction, search, classification)
 
 **Why:**
 - Function calling for structured output (action items, decisions)
@@ -272,5 +272,5 @@ Most importantly: **AI is contextual, not gimmicky**. Every feature solves a doc
 
 **Built by:** Yohan Yi
 **Target Persona:** Remote Team Professional (validated against real user research)
-**Technical Stack:** Swift, SwiftUI, Firebase, OpenAI GPT-4, Pinecone
+**Technical Stack:** Swift, SwiftUI, Firebase, OpenAI GPT-4o-mini (2-5x faster, 60x cheaper), Pinecone
 **Achievement:** A-grade submission with all core AI features deployed and functional
