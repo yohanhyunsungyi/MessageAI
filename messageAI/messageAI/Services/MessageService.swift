@@ -299,6 +299,11 @@ class MessageService: ObservableObject {
                         let readBy = (data["readBy"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
                         let deliveredTo = (data["deliveredTo"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
 
+                        // Decode priority from Firestore
+                        let priorityString = data["priority"] as? String
+                        let priority = priorityString.flatMap { MessagePriority(rawValue: $0) }
+                        let aiClassified = data["aiClassified"] as? Bool
+
                         return Message(
                             id: doc.documentID,  // Use Firestore document ID
                             senderId: senderId,
@@ -309,7 +314,9 @@ class MessageService: ObservableObject {
                             status: status,
                             readBy: readBy,
                             deliveredTo: deliveredTo,
-                            localId: data["localId"] as? String
+                            localId: data["localId"] as? String,
+                            priority: priority,
+                            aiClassified: aiClassified
                         )
                     }
                     print("✅ Listener decoded \(fetchedMessages.count) messages successfully")
@@ -372,6 +379,11 @@ class MessageService: ObservableObject {
                         let readBy = (data["readBy"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
                         let deliveredTo = (data["deliveredTo"] as? [String: Timestamp])?.mapValues { $0.dateValue() } ?? [:]
 
+                        // Decode priority from Firestore
+                        let priorityString = data["priority"] as? String
+                        let priority = priorityString.flatMap { MessagePriority(rawValue: $0) }
+                        let aiClassified = data["aiClassified"] as? Bool
+
                         return Message(
                             id: doc.documentID,
                             senderId: senderId,
@@ -382,7 +394,9 @@ class MessageService: ObservableObject {
                             status: status,
                             readBy: readBy,
                             deliveredTo: deliveredTo,
-                            localId: data["localId"] as? String
+                            localId: data["localId"] as? String,
+                            priority: priority,
+                            aiClassified: aiClassified
                         )
                     }
 
