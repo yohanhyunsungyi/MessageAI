@@ -9,9 +9,11 @@ const admin = require("firebase-admin");
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 
-// Import AI infrastructure (for future use)
-// const {openai} = require("./src/ai/openai");
-// const {pinecone} = require("./src/ai/pinecone");
+// Import AI infrastructure
+const { indexMessageInPinecone } = require("./src/triggers/onMessageCreate");
+const { searchMessages } = require("./src/features/vectorSearch");
+const { summarizeConversation } = require("./src/features/summarization");
+const { withRateLimit } = require("./src/middleware/rateLimit");
 
 /**
  * Send push notification when a new message is created
@@ -28,6 +30,11 @@ exports.sendMessageNotification = functions.firestore
         console.log(`📬 New message created in conversation: ${conversationId}`);
         console.log(`   Message ID: ${messageId}`);
         console.log(`   Sender: ${message.senderName}`);
+
+        // Index message in Pinecone (non-blocking, best-effort)
+        indexMessageInPinecone(message, context).catch((error) => {
+          console.error(`⚠️ Background indexing failed: ${error.message}`);
+        });
 
         // Get conversation to find recipients
         const conversationSnap = await admin.firestore()
@@ -243,4 +250,85 @@ exports.testAI = functions.https.onCall(async (data, context) => {
     userId: context.auth.uid,
   };
 });
+
+/**
+ * Smart Search - Vector Search with RAG
+ * Semantic search across all user's messages
+ * Call from iOS: functions.httpsCallable("smartSearch").call({ query: "...", topK: 5 })
+ */
+exports.smartSearch = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      const { query, topK, conversationId } = data;
+
+      if (!query || typeof query !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "query is required and must be a string",
+        );
+      }
+
+      console.log(`🔍 Smart search request from user: ${context.auth.uid}`);
+      console.log(`   Query: "${query}"`);
+
+      const results = await searchMessages(query, {
+        topK: topK || 5,
+        conversationId,
+        userId: context.auth.uid,
+      });
+
+      return {
+        query,
+        resultCount: results.length,
+        results,
+      };
+    }, "smart-search"),
+);
+
+/**
+ * Thread Summarization
+ * Summarize conversation threads into key points
+ * Call from iOS: functions.httpsCallable("summarizeConversation").call({ conversationId: "...", messageLimit: 200 })
+ */
+exports.summarizeConversation = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to summarize conversations",
+        );
+      }
+
+      const { conversationId, messageLimit } = data;
+
+      if (!conversationId || typeof conversationId !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "conversationId is required and must be a string",
+        );
+      }
+
+      console.log(`📝 Summarization request from user: ${context.auth.uid}`);
+      console.log(`   Conversation: ${conversationId}`);
+
+      try {
+        const result = await summarizeConversation(
+            conversationId,
+            context.auth.uid,
+            messageLimit || 200,
+        );
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ Summarization error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to summarize conversation",
+        );
+      }
+    }, "summarization"),
+);
 

@@ -72,10 +72,75 @@ class AIService: ObservableObject {
 
     /// Summarize a conversation thread
     /// - Parameter conversationId: ID of the conversation to summarize
+    /// - Parameter messageLimit: Maximum messages to include (default: 200)
     /// - Returns: Summary object with key points
-    func summarizeConversation(conversationId: String) async throws -> String {
-        // TODO: Implement in PR #24
-        throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not yet implemented"])
+    func summarizeConversation(conversationId: String, messageLimit: Int = 200) async throws -> Summary {
+        guard checkRateLimit() else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Rate limit exceeded"])
+        }
+
+        guard !conversationId.isEmpty else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Conversation ID cannot be empty"])
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            print("📝 [AIService] Requesting summary for conversation: \(conversationId)")
+
+            let params: [String: Any] = [
+                "conversationId": conversationId,
+                "messageLimit": messageLimit
+            ]
+
+            let result = try await functions.httpsCallable("summarizeConversation").call(params)
+
+            guard let data = result.data as? [String: Any] else {
+                throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response format"])
+            }
+
+            // Parse the response
+            let summaryText = data["summary"] as? String ?? ""
+            let keyPoints = data["keyPoints"] as? [String] ?? []
+            let messageCount = data["messageCount"] as? Int ?? 0
+            let participants = data["participants"] as? [String] ?? []
+
+            // Parse time range if present
+            var timeRange: Summary.TimeRange? = nil
+            if let timeRangeData = data["timeRange"] as? [String: Any],
+               let startTimestamp = timeRangeData["start"] as? [String: Any],
+               let endTimestamp = timeRangeData["end"] as? [String: Any],
+               let startSeconds = startTimestamp["_seconds"] as? Double,
+               let endSeconds = endTimestamp["_seconds"] as? Double {
+                timeRange = Summary.TimeRange(
+                    start: Date(timeIntervalSince1970: startSeconds),
+                    end: Date(timeIntervalSince1970: endSeconds)
+                )
+            }
+
+            let summary = Summary(
+                conversationId: conversationId,
+                summary: summaryText,
+                keyPoints: keyPoints,
+                messageCount: messageCount,
+                timeRange: timeRange,
+                participants: participants
+            )
+
+            print("✅ [AIService] Summary generated: \(keyPoints.count) key points")
+            return summary
+
+        } catch {
+            let errorMsg = handleError(error)
+            errorMessage = errorMsg
+            print("❌ [AIService] Summarization failed: \(errorMsg)")
+            throw error
+        }
     }
 
     /// Extract action items from a conversation
@@ -86,12 +151,52 @@ class AIService: ObservableObject {
         throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not yet implemented"])
     }
 
-    /// Smart search across all messages
-    /// - Parameter query: Search query
-    /// - Returns: Array of relevant messages
-    func smartSearch(query: String) async throws -> [String] {
-        // TODO: Implement in PR #26
-        throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not yet implemented"])
+    /// Smart search across all messages using semantic similarity
+    /// - Parameters:
+    ///   - query: Search query
+    ///   - topK: Number of results to return (default: 5)
+    ///   - conversationId: Optional conversation filter
+    /// - Returns: Array of search results with message data and scores
+    func smartSearch(query: String, topK: Int = 5, conversationId: String? = nil) async throws -> [[String: Any]] {
+        guard checkRateLimit() else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Rate limit exceeded"])
+        }
+
+        guard !query.isEmpty else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Search query cannot be empty"])
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            var params: [String: Any] = [
+                "query": query,
+                "topK": topK
+            ]
+
+            if let conversationId = conversationId {
+                params["conversationId"] = conversationId
+            }
+
+            let result = try await functions.httpsCallable("smartSearch").call(params)
+
+            if let data = result.data as? [String: Any],
+               let results = data["results"] as? [[String: Any]] {
+                print("✅ [AIService] Found \(results.count) results for query: \(query)")
+                return results
+            }
+
+            return []
+        } catch {
+            let errorMsg = handleError(error)
+            errorMessage = errorMsg
+            throw error
+        }
     }
 
     /// Extract decisions from a conversation

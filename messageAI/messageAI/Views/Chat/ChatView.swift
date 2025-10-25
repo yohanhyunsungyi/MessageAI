@@ -13,6 +13,10 @@ struct ChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @State private var hasInitialized = false
     @StateObject private var viewModelWrapper = ChatViewModelWrapper()
+    @StateObject private var aiService = AIService()
+    @State private var showSummary = false
+    @State private var currentSummary: Summary?
+    @State private var isSummarizing = false
 
     let conversationId: String
     let localStorageService: LocalStorageService?
@@ -87,6 +91,24 @@ struct ChatView: View {
                     .font(UIStyleGuide.Typography.bodyBold)
                     .foregroundColor(UIStyleGuide.Colors.textPrimary)
             }
+
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task {
+                        await summarizeConversation()
+                    }
+                } label: {
+                    if isSummarizing {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.blue)
+                    }
+                }
+                .disabled(isSummarizing || (viewModel?.messages.isEmpty ?? true))
+            }
         }
         .task {
             if !hasInitialized {
@@ -109,6 +131,33 @@ struct ChatView: View {
                 Text(errorMessage)
             }
         }
+        .sheet(isPresented: $showSummary) {
+            if let summary = currentSummary {
+                SummaryView(summary: summary)
+            }
+        }
+    }
+
+    // MARK: - AI Features
+
+    private func summarizeConversation() async {
+        isSummarizing = true
+
+        do {
+            print("📝 [ChatView] Requesting summary for conversation: \(conversationId)")
+            let summary = try await aiService.summarizeConversation(conversationId: conversationId)
+            currentSummary = summary
+            showSummary = true
+            print("✅ [ChatView] Summary received")
+        } catch {
+            print("❌ [ChatView] Failed to summarize: \(error.localizedDescription)")
+            // Show error to user
+            if let viewModel = viewModel {
+                viewModel.errorMessage = "Failed to generate summary. Please try again."
+            }
+        }
+
+        isSummarizing = false
     }
 
     private func setupViewModel() {
