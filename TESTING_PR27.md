@@ -212,3 +212,54 @@ Note: Tests not yet implemented, but the function is production-ready.
 ✅ Push notifications include priority emoji
 ✅ No crashes or errors in normal operation
 ✅ Graceful degradation if AI fails
+✅ **NEW:** Action items automatically extracted from priority messages
+
+## Automatic Action Item Extraction (Bonus Feature)
+
+### How It Works
+When a **high** or **critical** priority message is detected, the system automatically:
+1. Analyzes the message for actionable tasks
+2. Extracts structured action items (description, assignee, deadline)
+3. Saves them to Firestore under `conversations/{id}/actionItems`
+4. Makes them visible in the Action Items tab
+
+### Test This Feature
+
+**Send a priority message with actionable content:**
+```
+"URGENT: Need to fix the login bug by tomorrow.
+John should review the auth code and deploy the patch ASAP."
+```
+
+**Expected Result:**
+- Message gets 🔴 or 🟡 badge (priority classification)
+- Action items automatically created:
+  - "Fix the login bug" - Assignee: Auto-detected, Deadline: tomorrow
+  - "Review the auth code" - Assignee: John
+  - "Deploy the patch" - Priority: high
+
+**Check Action Items:**
+1. Navigate to Action Items tab in the app
+2. Should see newly created items from the priority message
+3. Items should have `createdFrom: "priority-message"` metadata
+
+**Check Firestore:**
+- Go to: `conversations/{conversationId}/actionItems`
+- New documents should appear with:
+  - `description`: Task description
+  - `assignee`: Detected from message (or null)
+  - `priority`: "high", "medium", or "low"
+  - `status`: "pending"
+  - `sourceMessageId`: ID of the priority message
+  - `createdFrom`: "priority-message"
+
+**Performance:**
+- Action item extraction runs in background (non-blocking)
+- Message sending is not delayed
+- Extraction completes within 2-3 seconds
+
+**Edge Cases:**
+- If no action keywords found, extraction is skipped
+- If extraction fails, message still works normally
+- Only high/critical priority messages trigger auto-extraction
+- Normal priority messages don't trigger automatic extraction
