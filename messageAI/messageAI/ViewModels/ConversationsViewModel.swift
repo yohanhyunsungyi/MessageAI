@@ -195,14 +195,15 @@ class ConversationsViewModel: ObservableObject {
 
     // MARK: - Private Methods
 
-    /// Filter conversations based on search text
+    /// Filter conversations based on search text and sort by priority
     private func filterConversations() {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        var filtered: [Conversation]
         if trimmedQuery.isEmpty {
-            filteredConversations = conversations
+            filtered = conversations
         } else {
-            filteredConversations = conversations.filter { conversation in
+            filtered = conversations.filter { conversation in
                 let conversationName = getConversationName(conversation).lowercased()
                 let lastMessage = conversation.lastMessage?.lowercased() ?? ""
                 let query = trimmedQuery.lowercased()
@@ -210,6 +211,24 @@ class ConversationsViewModel: ObservableObject {
                 return conversationName.contains(query) || lastMessage.contains(query)
             }
         }
+
+        // Sort conversations: priority first, then timestamp
+        filtered.sort { conv1, conv2 in
+            let priority1 = conv1.lastMessagePriority?.sortValue ?? 1
+            let priority2 = conv2.lastMessagePriority?.sortValue ?? 1
+
+            // Sort by priority (descending - higher value first)
+            if priority1 != priority2 {
+                return priority1 > priority2
+            }
+
+            // If same priority, sort by timestamp (most recent first)
+            let timestamp1 = conv1.lastMessageTimestamp ?? Date.distantPast
+            let timestamp2 = conv2.lastMessageTimestamp ?? Date.distantPast
+            return timestamp1 > timestamp2
+        }
+
+        filteredConversations = filtered
     }
 }
 

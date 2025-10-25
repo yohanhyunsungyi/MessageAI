@@ -16,6 +16,7 @@ struct Conversation: Codable, Identifiable {
     var lastMessage: String?
     var lastMessageTimestamp: Date?
     var lastMessageSenderId: String?
+    var lastMessagePriority: MessagePriority?       // Priority of last message
     var type: ConversationType                      // .oneOnOne or .group
     var groupName: String?                          // Only for groups
     var createdAt: Date

@@ -41,9 +41,21 @@ struct MessageBubbleView: View {
                 }
 
                 VStack(alignment: alignment, spacing: 4) {
-                    // Message bubble
-                    messageBubble
-                        .clipShape(BubbleShape(isFromCurrentUser: isFromCurrentUser, position: position))
+                    // Priority indicator + Message bubble
+                    HStack(spacing: 4) {
+                        if !isFromCurrentUser, let priority = message.priority, priority != .normal {
+                            Text(priority.emoji)
+                                .font(.system(size: 12))
+                        }
+
+                        messageBubble
+                            .clipShape(BubbleShape(isFromCurrentUser: isFromCurrentUser, position: position))
+
+                        if isFromCurrentUser, let priority = message.priority, priority != .normal {
+                            Text(priority.emoji)
+                                .font(.system(size: 12))
+                        }
+                    }
 
                     // Timestamp and status
                     if showTimestamp {
