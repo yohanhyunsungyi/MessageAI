@@ -170,6 +170,11 @@ final class NotificationService: NSObject, ObservableObject {
         conversationId: String,
         senderImageURL: String? = nil
     ) async {
+        print("🔔 [NotificationService] showForegroundNotification called")
+        print("   - Sender: \(senderName)")
+        print("   - Message: \(message)")
+        print("   - Conversation: \(conversationId)")
+
         let content = UNMutableNotificationContent()
         content.title = senderName
         content.body = message
@@ -202,10 +207,12 @@ final class NotificationService: NSObject, ObservableObject {
         )
 
         do {
+            print("   → Sending notification request to UNUserNotificationCenter...")
             try await notificationCenter.add(request)
-            print("🔔 Foreground notification shown: \(senderName)")
+            print("✅ [NotificationService] Notification successfully added: \(senderName)")
         } catch {
-            print("❌ Failed to show notification: \(error)")
+            print("❌ [NotificationService] Failed to show notification: \(error)")
+            print("   Error details: \(error.localizedDescription)")
         }
     }
 

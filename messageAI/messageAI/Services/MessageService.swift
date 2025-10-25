@@ -497,26 +497,33 @@ class MessageService: ObservableObject {
 
     /// Show foreground notifications for new messages (only when NOT viewing the conversation)
     private func showForegroundNotifications(_ newMessages: [Message], conversationId: String) async {
+        print("🔔 [DEBUG] showForegroundNotifications called")
+        print("   - New messages count: \(newMessages.count)")
+        print("   - Conversation ID: \(conversationId)")
+        print("   - Current conversation ID: \(currentConversationId ?? "nil")")
+        print("   - NotificationService available: \(notificationService != nil)")
+
         guard let notificationService = notificationService else {
-            print("⚠️ NotificationService not available")
+            print("❌ NotificationService not available - NOTIFICATIONS WILL NOT WORK!")
             return
         }
 
         // Only show if NOT currently viewing this conversation
         guard currentConversationId != conversationId else {
-            print("📱 User is viewing \(conversationId) - skipping in-app notification")
+            print("📱 User is viewing \(conversationId) - suppressing notification (CORRECT)")
             return
         }
 
         // Show notifications for new messages from other conversations
         for message in newMessages {
-            print("🔔 Showing foreground notification for: \(message.senderName)")
+            print("🔔 SHOWING NOTIFICATION: \(message.senderName): \(message.text)")
             await notificationService.showForegroundNotification(
                 from: message.senderName,
                 message: message.text,
                 conversationId: conversationId,
                 senderImageURL: message.senderPhotoURL
             )
+            print("✅ Notification request sent to UNUserNotificationCenter")
         }
     }
 
