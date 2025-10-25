@@ -132,10 +132,20 @@ class ConversationsViewModel: ObservableObject {
 
     /// Start monitoring all conversations for new messages (for notifications)
     func startMonitoringConversations() {
-        print("🔔 Stopping existing monitors before restart")
-        messageService.stopAllMonitoring()
-
         print("🔔 Starting to monitor \(conversations.count) conversations")
+
+        // Get current conversation IDs
+        let currentConversationIds = Set(conversations.map { $0.id })
+
+        // Stop monitoring conversations that are no longer in the list
+        let monitoredIds = Set(messageService.getMonitoredConversationIds())
+        let idsToRemove = monitoredIds.subtracting(currentConversationIds)
+        for id in idsToRemove {
+            messageService.stopMonitoring(conversationId: id)
+            print("🔕 Stopped monitoring removed conversation: \(id)")
+        }
+
+        // Start monitoring new conversations (MessageService's guard prevents duplicates)
         for conversation in conversations {
             messageService.startMonitoring(conversationId: conversation.id)
         }

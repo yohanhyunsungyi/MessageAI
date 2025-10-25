@@ -428,6 +428,11 @@ class MessageService: ObservableObject {
         conversationListeners.removeAll()
     }
 
+    /// Get IDs of conversations currently being monitored
+    func getMonitoredConversationIds() -> [String] {
+        return Array(conversationListeners.keys)
+    }
+
     /// Set which conversation is currently being viewed (to suppress notifications)
     func setActiveConversation(_ conversationId: String?) {
         activeConversationId = conversationId
