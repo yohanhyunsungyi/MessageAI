@@ -6,13 +6,18 @@
 const { Pinecone } = require("@pinecone-database/pinecone");
 const functions = require("firebase-functions");
 
+// Load environment variables from .env.local for local development
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config({ path: ".env.local" });
+}
+
 /**
- * Initialize Pinecone client with API key from Firebase config
- * Set API key using: firebase functions:config:set pinecone.api_key="..."
+ * Initialize Pinecone client with API key
+ * Priority: .env.local > Firebase config > environment variable
  */
 const pineconeConfig = functions.config().pinecone || {};
 const pinecone = new Pinecone({
-  apiKey: pineconeConfig.api_key || process.env.PINECONE_API_KEY,
+  apiKey: process.env.PINECONE_API_KEY || pineconeConfig.api_key,
 });
 
 /**

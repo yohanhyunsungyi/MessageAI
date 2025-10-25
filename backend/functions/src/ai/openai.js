@@ -6,13 +6,18 @@
 const OpenAI = require("openai");
 const functions = require("firebase-functions");
 
+// Load environment variables from .env.local for local development
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config({ path: ".env.local" });
+}
+
 /**
- * Initialize OpenAI client with API key from Firebase config
- * Set API key using: firebase functions:config:set openai.api_key="sk-..."
+ * Initialize OpenAI client with API key
+ * Priority: .env.local > Firebase config > environment variable
  */
 const openaiConfig = functions.config().openai || {};
 const openai = new OpenAI({
-  apiKey: openaiConfig.api_key || process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || openaiConfig.api_key,
 });
 
 /**

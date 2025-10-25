@@ -11,7 +11,25 @@ This document explains how to configure and use the AI features in MessageAI.
 
 ### 1. Configure API Keys
 
-Set the API keys using Firebase Functions configuration:
+#### Option A: Local Development (.env.local) - RECOMMENDED
+
+1. Copy the example environment file:
+```bash
+cd backend/functions
+cp .env.example .env.local
+```
+
+2. Edit `.env.local` and add your API keys:
+```bash
+OPENAI_API_KEY=sk-your_actual_openai_key
+PINECONE_API_KEY=your_actual_pinecone_key
+```
+
+3. The `.env.local` file is already in `.gitignore` - never commit it!
+
+#### Option B: Firebase Functions Config (Production)
+
+For production deployment, set keys using Firebase Functions configuration:
 
 ```bash
 # Set OpenAI API key
@@ -20,6 +38,8 @@ firebase functions:config:set openai.api_key="sk-..."
 # Set Pinecone API key
 firebase functions:config:set pinecone.api_key="..."
 ```
+
+**Priority Order**: .env.local → Firebase config → environment variable
 
 ### 2. Create Pinecone Index
 
@@ -94,13 +114,14 @@ backend/functions/src/
 5. **Decision Tracking** (PR #28) - Extract and track key decisions
 6. **Proactive Assistant** (PRs #30-32) - Multi-step scheduling agent
 
-## Environment Variables (for local development)
+## Local Development Workflow
 
-```bash
-# .env file (do not commit!)
-OPENAI_API_KEY=sk-...
-PINECONE_API_KEY=...
-```
+1. **Edit `.env.local`** with your API keys (never commit this file!)
+2. **Run tests**: `npm test` or `node src/__tests__/openai.test.js`
+3. **Start emulators**: `npm run serve` or `firebase emulators:start --only functions`
+4. **Deploy**: `npm run deploy` or `firebase deploy --only functions`
+
+The code automatically loads `.env.local` in non-production environments.
 
 ## Troubleshooting
 
