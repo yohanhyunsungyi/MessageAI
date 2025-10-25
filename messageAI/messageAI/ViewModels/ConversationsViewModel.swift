@@ -31,6 +31,7 @@ class ConversationsViewModel: ObservableObject {
     private let authService: AuthService
     private let messageService: MessageService
     private var cancellables = Set<AnyCancellable>()
+    private var monitoredConversationIds: Set<String> = []
 
     // MARK: - Initialization
 
@@ -77,8 +78,15 @@ class ConversationsViewModel: ObservableObject {
                 self.filterConversations()
                 print("🔔 Filtered conversations: \(self.filteredConversations.count)")
 
-                // Automatically start monitoring all conversations for notifications
-                self.startMonitoringConversations()
+                // Only start monitoring if conversation IDs changed (prevents duplicate listeners)
+                let currentConversationIds = Set(conversations.map { $0.id })
+                if currentConversationIds != self.monitoredConversationIds {
+                    print("🔔 Conversation IDs changed - updating monitoring")
+                    self.monitoredConversationIds = currentConversationIds
+                    self.startMonitoringConversations()
+                } else {
+                    print("🔔 Same conversations - skipping duplicate monitoring setup")
+                }
             }
             .store(in: &cancellables)
 
