@@ -209,13 +209,33 @@ class LocalStorageService: ObservableObject {
     }
 
     /// Fetch all conversations
-    func fetchConversations() -> [LocalConversation] {
-        print("🔍 Fetching all conversations from local storage...")
+    func fetchConversations(userId: String? = nil) -> [LocalConversation] {
+        if let userId = userId {
+            print("🔍 Fetching conversations for user \(userId) from local storage...")
+        } else {
+            print("🔍 Fetching all conversations from local storage...")
+        }
 
         do {
             let descriptor = FetchDescriptor<LocalConversation>()
-            let conversations = try modelContext.fetch(descriptor)
-            print("✅ Successfully fetched \(conversations.count) conversations")
+            let allConversations = try modelContext.fetch(descriptor)
+
+            // Filter by userId if provided
+            let conversations: [LocalConversation]
+            if let userId = userId {
+                conversations = allConversations.filter { conversation in
+                    // Decode participantIdsJSON to check if user is participant
+                    guard let participantIdsData = conversation.participantIdsJSON.data(using: .utf8),
+                          let participantIds = try? JSONDecoder().decode([String].self, from: participantIdsData) else {
+                        return false
+                    }
+                    return participantIds.contains(userId)
+                }
+                print("✅ Successfully fetched \(conversations.count) conversations for user (out of \(allConversations.count) total)")
+            } else {
+                conversations = allConversations
+                print("✅ Successfully fetched \(conversations.count) conversations")
+            }
 
             // Sort in Swift to handle optional lastMessageTimestamp
             return conversations.sorted { conv1, conv2 in

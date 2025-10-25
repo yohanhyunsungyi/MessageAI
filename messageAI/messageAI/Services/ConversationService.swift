@@ -247,15 +247,15 @@ class ConversationService: ObservableObject {
 
         defer { isLoading = false }
 
-        // Load from local cache for instant UI
+        // Load from local cache for instant UI (filtered by current user)
         // The real-time listener will provide the source of truth
-        let localConversations = localStorageService.fetchConversations()
+        let localConversations = localStorageService.fetchConversations(userId: currentUserId)
         if !localConversations.isEmpty {
             let conversations = convertLocalConversations(localConversations)
             self.conversations = conversations
-            print("📱 Loaded \(conversations.count) conversations from local cache")
+            print("📱 Loaded \(conversations.count) conversations from local cache for user \(currentUserId)")
         } else {
-            print("📱 No local cache, waiting for real-time listener...")
+            print("📱 No local cache for user \(currentUserId), waiting for real-time listener...")
         }
         
         // Note: We DON'T fetch from Firestore here to avoid race condition
