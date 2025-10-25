@@ -132,6 +132,9 @@ class ConversationsViewModel: ObservableObject {
 
     /// Start monitoring all conversations for new messages (for notifications)
     func startMonitoringConversations() {
+        print("🔔 Stopping existing monitors before restart")
+        messageService.stopAllMonitoring()
+
         print("🔔 Starting to monitor \(conversations.count) conversations")
         for conversation in conversations {
             messageService.startMonitoring(conversationId: conversation.id)
