@@ -42,12 +42,24 @@ service cloud.firestore {
       
       // Typing indicators subcollection (temporary, auto-delete)
       match /typing/{userId} {
-        allow read: if isSignedIn() && 
+        allow read: if isSignedIn() &&
           request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
-        allow write: if isSignedIn() && 
+        allow write: if isSignedIn() &&
           isOwner(userId) &&
           request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
       }
+    }
+
+    // Action Items collection
+    match /actionItems/{actionItemId} {
+      // Allow read for all authenticated users (can filter client-side)
+      allow read: if isSignedIn();
+      // Allow create only by Cloud Functions
+      allow create: if false;
+      // Allow update for marking complete/incomplete/dismissed
+      allow update: if isSignedIn();
+      // No delete - use status field instead
+      allow delete: if false;
     }
   }
 }
