@@ -177,7 +177,15 @@ async function handleSchedulingDetection(messageData, context) {
     const conversationData = conversationSnap.data();
 
     // Create proactive suggestion
-    await createProactiveSuggestion(detection, conversationData);
+    const suggestionId = await createProactiveSuggestion(detection, conversationData);
+
+    // Generate time slots in background (non-blocking)
+    // Import here to avoid circular dependencies
+    const { generateTimeSlotsForSuggestion } = require("./timeSlots");
+    generateTimeSlotsForSuggestion(suggestionId).catch((error) => {
+      console.error(`❌ Background time slot generation failed:`, error);
+      // Don't fail the whole process if time slots fail
+    });
   } catch (error) {
     console.error(`❌ Scheduling detection handler failed:`, error);
     // Don't throw - this is a background process

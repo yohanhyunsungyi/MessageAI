@@ -148,9 +148,87 @@ const CLASSIFY_PRIORITY_SCHEMA = {
   },
 };
 
+/**
+ * Get User Timezone Tool Schema
+ * Used by proactive assistant to get user's timezone
+ */
+const GET_USER_TIMEZONE_SCHEMA = {
+  name: "get_user_timezone",
+  description: "Get the timezone identifier for a user",
+  parameters: {
+    type: "object",
+    properties: {
+      userId: {
+        type: "string",
+        description: "The user's ID",
+      },
+    },
+    required: ["userId"],
+  },
+};
+
+/**
+ * Check Availability Tool Schema
+ * Used to check if a time slot works for given users
+ */
+const CHECK_AVAILABILITY_SCHEMA = {
+  name: "check_availability",
+  description: "Check if a time slot is available for given users",
+  parameters: {
+    type: "object",
+    properties: {
+      userIds: {
+        type: "array",
+        items: { type: "string" },
+        description: "Array of user IDs to check",
+      },
+      startTime: {
+        type: "string",
+        description: "Start time in ISO 8601 format",
+      },
+      duration: {
+        type: "number",
+        description: "Duration in minutes",
+      },
+    },
+    required: ["userIds", "startTime", "duration"],
+  },
+};
+
+/**
+ * Generate Time Slots Tool Schema
+ * Used to generate meeting time suggestions
+ */
+const GENERATE_TIME_SLOTS_SCHEMA = {
+  name: "generate_time_slots",
+  description: "Generate optimal meeting time suggestions for users",
+  parameters: {
+    type: "object",
+    properties: {
+      userIds: {
+        type: "array",
+        items: { type: "string" },
+        description: "Array of participant user IDs",
+      },
+      duration: {
+        type: "number",
+        description: "Meeting duration in minutes (default: 60)",
+      },
+      daysOut: {
+        type: "number",
+        description: "Days in future to start suggestions (default: 2)",
+      },
+    },
+    required: ["userIds"],
+  },
+};
+
 module.exports = {
   EXTRACT_ACTION_ITEMS_SCHEMA,
   EXTRACT_DECISIONS_SCHEMA,
   DETECT_SCHEDULING_NEED_SCHEMA,
   CLASSIFY_PRIORITY_SCHEMA,
+  GET_USER_TIMEZONE_SCHEMA,
+  CHECK_AVAILABILITY_SCHEMA,
+  GENERATE_TIME_SLOTS_SCHEMA,
 };
