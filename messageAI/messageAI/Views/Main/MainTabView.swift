@@ -16,6 +16,7 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var conversationsViewModel: ConversationsViewModel?
     @State private var hasSetupMonitoring = false
+    @State private var showSearch = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -30,6 +31,17 @@ struct MainTabView: View {
                     }
                 }
                 .tag(0)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            showSearch = true
+                        }) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: UIStyleGuide.IconSize.medium))
+                                .foregroundColor(UIStyleGuide.Colors.textPrimary)
+                        }
+                    }
+                }
 
             // Users Tab
             UsersListView()
@@ -68,6 +80,9 @@ struct MainTabView: View {
                 .tag(3)
         }
         .accentColor(UIStyleGuide.Colors.tabBarSelected)
+        .sheet(isPresented: $showSearch) {
+            SmartSearchView()
+        }
         .task {
             if !hasSetupMonitoring {
                 await setupGlobalMonitoring()

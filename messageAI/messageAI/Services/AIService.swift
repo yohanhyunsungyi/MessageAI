@@ -24,6 +24,14 @@ class AIService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    // MARK: - Search Cache
+
+    /// Cache for search results
+    /// Key: search query, Value: (results, timestamp)
+    private var searchCache: [String: (results: [SearchResult], timestamp: Date)] = [:]
+    private let cacheExpirationInterval: TimeInterval = 5 * 60 // 5 minutes
+    private let maxCachedQueries = 10
+
     // MARK: - Initialization
 
     init() {
@@ -283,13 +291,20 @@ class AIService: ObservableObject {
     ///   - topK: Number of results to return (default: 5)
     ///   - conversationId: Optional conversation filter
     /// - Returns: Array of search results with message data and scores
-    func smartSearch(query: String, topK: Int = 5, conversationId: String? = nil) async throws -> [[String: Any]] {
+    func smartSearch(query: String, topK: Int = 5, conversationId: String? = nil) async throws -> [SearchResult] {
         guard checkRateLimit() else {
             throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Rate limit exceeded"])
         }
 
         guard !query.isEmpty else {
             throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Search query cannot be empty"])
+        }
+
+        // Check cache first
+        let cacheKey = "\(query)|\(topK)|\(conversationId ?? "")"
+        if let cached = getCachedSearchResults(for: cacheKey) {
+            print("✅ [AIService] Returning \(cached.count) cached results for query: \(query)")
+            return cached
         }
 
         isLoading = true
@@ -309,20 +324,68 @@ class AIService: ObservableObject {
                 params["conversationId"] = conversationId
             }
 
+            print("🔍 [AIService] Searching for: \(query)")
+
             let result = try await functions.httpsCallable("smartSearch").call(params)
 
-            if let data = result.data as? [String: Any],
-               let results = data["results"] as? [[String: Any]] {
-                print("✅ [AIService] Found \(results.count) results for query: \(query)")
-                return results
+            guard let data = result.data as? [String: Any],
+                  let resultsData = data["results"] as? [[String: Any]] else {
+                print("⚠️ [AIService] No results found for query: \(query)")
+                return []
             }
 
-            return []
+            // Parse results into SearchResult models
+            let results = resultsData.compactMap { SearchResult(from: $0) }
+
+            print("✅ [AIService] Found \(results.count) results for query: \(query)")
+
+            // Cache the results
+            cacheSearchResults(results, for: cacheKey)
+
+            return results
         } catch {
             let errorMsg = handleError(error)
             errorMessage = errorMsg
             throw error
         }
+    }
+
+    // MARK: - Cache Management
+
+    /// Get cached search results if still valid
+    private func getCachedSearchResults(for key: String) -> [SearchResult]? {
+        guard let cached = searchCache[key] else {
+            return nil
+        }
+
+        // Check if cache is still valid
+        let now = Date()
+        if now.timeIntervalSince(cached.timestamp) < cacheExpirationInterval {
+            return cached.results
+        }
+
+        // Cache expired, remove it
+        searchCache.removeValue(forKey: key)
+        return nil
+    }
+
+    /// Cache search results
+    private func cacheSearchResults(_ results: [SearchResult], for key: String) {
+        // Enforce cache size limit
+        if searchCache.count >= maxCachedQueries {
+            // Remove oldest entry
+            if let oldestKey = searchCache.min(by: { $0.value.timestamp < $1.value.timestamp })?.key {
+                searchCache.removeValue(forKey: oldestKey)
+            }
+        }
+
+        searchCache[key] = (results: results, timestamp: Date())
+    }
+
+    /// Clear search cache
+    func clearSearchCache() {
+        searchCache.removeAll()
+        print("🗑️ [AIService] Search cache cleared")
     }
 
     /// Extract decisions from a conversation
