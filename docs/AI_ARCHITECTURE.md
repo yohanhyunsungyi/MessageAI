@@ -82,7 +82,7 @@ MessageAI uses a **hybrid architecture** combining local-first messaging with cl
 │                    External AI Services                     │
 │                                                             │
 │  ┌──────────────────────┐  ┌───────────────────────────┐  │
-│  │  OpenAI GPT-4 Turbo  │  │  Pinecone Vector DB       │  │
+│  │  OpenAI GPT-4o-mini (2-5x faster, 60x cheaper)  │  │  Pinecone Vector DB       │  │
 │  │                      │  │                           │  │
 │  │  • Chat Completions  │  │  • Message embeddings     │  │
 │  │  • Function Calling  │  │  • Semantic search        │  │
@@ -223,8 +223,8 @@ Cloud Function: summarizeConversation
        ↓
 Fetch messages from Firestore
        ↓
-Call OpenAI GPT-4 Turbo
-  - Model: gpt-4-turbo
+Call OpenAI GPT-4o-mini (2-5x faster, 60x cheaper)
+  - Model: gpt-4o-mini
   - Prompt: SUMMARIZATION_PROMPT
   - Messages: Last 100 messages
        ↓
@@ -311,7 +311,7 @@ Format:
 - Bottleneck: OpenAI API latency
 
 **Cost:**
-- ~$0.01-0.05 per summary (GPT-4 Turbo pricing)
+- ~$0.01-0.05 per summary (GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo) pricing)
 
 ---
 
@@ -457,7 +457,7 @@ async function smartSearch(query, topK = 5, conversationId) {
 ```javascript
 async function classifyPriority(message) {
   const response = await openai.chat.completions.create({
-    model: "gpt-4-turbo",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: PRIORITY_CLASSIFICATION_PROMPT },
       { role: "user", content: message.text }
@@ -535,7 +535,7 @@ interface Decision {
 ```javascript
 async function parseCommand(userMessage) {
   const response = await openai.chat.completions.create({
-    model: "gpt-4-turbo",
+    model: "gpt-4o-mini",
     temperature: 0.3, // Low for consistent classification
     messages: [
       { role: "system", content: NL_COMMAND_PARSER_PROMPT },
@@ -827,7 +827,7 @@ async function rerankResults(query, vectorResults) {
 
   // GPT-4 re-ranking for better relevance
   const response = await openai.chat.completions.create({
-    model: "gpt-4-turbo",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }]
   });
 
@@ -1172,7 +1172,7 @@ firebase functions:config:set pinecone.api_key="..."
 
 ### OpenAI API Costs
 
-**GPT-4 Turbo:**
+**GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo):**
 - Input: $0.01 per 1K tokens
 - Output: $0.03 per 1K tokens
 - Typical summary: ~$0.02 (500 input + 100 output tokens)

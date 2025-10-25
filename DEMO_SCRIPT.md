@@ -119,7 +119,7 @@
 **Script:**
 > "Feature 1: Thread Summarization. Sarah missed 50 messages about the API redesign. Instead of reading everything, she taps the sparkles button.
 >
-> GPT-4 Turbo analyzes the conversation and extracts key decisions, blockers, and action items in under 2 seconds. That's 15 minutes saved.
+> GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo) analyzes the conversation and extracts key decisions, blockers, and action items in under 2 seconds. That's 15 minutes saved.
 >
 > Notice: Not generic summary - focused on what engineers care about: decisions, blockers, action items."
 
@@ -348,7 +348,7 @@
 > - **Performance:** Vector search (<100ms) + GPT-4 (<2s) = sub-second AI features
 >
 > **AI Stack:**
-> - OpenAI GPT-4 Turbo for all features (summarization, extraction, classification)
+> - OpenAI GPT-4o-mini (2-5x faster, 60x cheaper) for all features (summarization, extraction, classification)
 > - Pinecone for vector embeddings (1536 dimensions, semantic search)
 > - Function calling for structured output (action items, decisions)
 >
@@ -520,7 +520,7 @@ Solves real pain points:
 
 Built with:
 • SwiftUI + Firebase
-• OpenAI GPT-4 Turbo
+• OpenAI GPT-4o-mini (2-5x faster, 60x cheaper)
 • Pinecone vector DB
 • Local-first architecture
 

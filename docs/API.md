@@ -558,7 +558,7 @@ None (or optional `testType` for specific tests)
   "services": {
     "openai": {
       "status": "connected",
-      "model": "gpt-4-turbo",
+      "model": "gpt-4o-mini",
       "latency": 234
     },
     "pinecone": {

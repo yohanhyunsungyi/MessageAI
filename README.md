@@ -22,7 +22,7 @@ A production-quality iOS messaging application built with SwiftUI, Firebase, and
 - ✅ **Local-First Architecture:** Instant UI updates, offline support
 - ✅ **Push Notifications:** FCM push notifications
 
-### AI Features (Powered by OpenAI GPT-4 + Pinecone) ✅
+### AI Features (Powered by OpenAI GPT-4o-mini (2-5x faster, 60x cheaper) + Pinecone) ✅
 - ✅ **Thread Summarization:** Get concise summaries of long conversations with key points and action items (<2s)
 - ✅ **Action Item Extraction:** Automatically identify and track action items from conversations with priority and assignee detection
 - ✅ **Smart Search (RAG):** Semantic search across all messages using vector embeddings and intelligent re-ranking (<1s)
@@ -36,7 +36,7 @@ A production-quality iOS messaging application built with SwiftUI, Firebase, and
 - **Frontend:** iOS (Swift + SwiftUI)
 - **Backend:** Firebase (Firestore, Auth, FCM, Cloud Functions)
 - **Local Storage:** SwiftData for offline persistence
-- **AI Services:** OpenAI GPT-4 Turbo, Pinecone Vector DB
+- **AI Services:** OpenAI GPT-4o-mini (2-5x faster, 60x cheaper), Pinecone Vector DB
 - **Approach:** Local-first for instant UI feedback + AI-powered intelligence
 
 ```
@@ -69,7 +69,7 @@ A production-quality iOS messaging application built with SwiftUI, Firebase, and
 ┌─────────────────────────────────┐
 │   AI Services                   │
 ├─────────────────────────────────┤
-│ • OpenAI GPT-4 Turbo            │
+│ • OpenAI GPT-4o-mini (2-5x faster, 60x cheaper)            │
 │ • Pinecone Vector Database      │
 │ • RAG Pipeline (Embeddings)     │
 └─────────────────────────────────┘
@@ -434,7 +434,7 @@ Yohan Yi - [@yohanhyunsungyi](https://github.com/yohanhyunsungyi)
 
 ### 1. Thread Summarization ✅
 - **What:** Get concise summaries of long conversations with key points and action items
-- **How:** GPT-4 Turbo analyzes messages and extracts: key decisions, blockers, action items, important updates
+- **How:** GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo) analyzes messages and extracts: key decisions, blockers, action items, important updates
 - **Performance:** <2 seconds for 100-message conversations (Target: <2s ✅)
 - **UI:** Sparkles (✨) button in chat view → beautiful summary sheet
 - **Cloud Function:** `summarizeConversation` (us-central1)
@@ -457,7 +457,7 @@ Yohan Yi - [@yohanhyunsungyi](https://github.com/yohanhyunsungyi)
 
 ### 4. Priority Detection ✅
 - **What:** Real-time classification of urgent messages
-- **How:** Firestore trigger → GPT-4 Turbo fast classification analyzing urgency indicators, keywords, context
+- **How:** Firestore trigger → GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo) fast classification analyzing urgency indicators, keywords, context
 - **Performance:** <500ms background processing (Target: <500ms ✅)
 - **UI:** Priority badges (🔴 critical, 🟡 high) on messages and conversation rows
 - **Cloud Function:** Integrated in `sendMessageNotification` trigger
@@ -473,7 +473,7 @@ Yohan Yi - [@yohanhyunsungyi](https://github.com/yohanhyunsungyi)
 
 ### 6. AI Chat Assistant ✅
 - **What:** Natural language interface to access all AI features
-- **How:** GPT-4 Turbo parses user intent and routes to appropriate AI feature
+- **How:** GPT-4o-mini (2-5x faster, 60x cheaper than GPT-4 Turbo) parses user intent and routes to appropriate AI feature
 - **Supported Commands:**
   - "Summarize my latest conversation"
   - "What are my tasks?" / "List my action items"
