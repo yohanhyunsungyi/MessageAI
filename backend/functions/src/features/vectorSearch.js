@@ -47,8 +47,13 @@ async function searchMessages(query, options = {}) {
         userId,
     );
 
+    // Filter to only show results with 50%+ relevance (score >= 0.5)
+    const relevantResults = accessibleResults.filter((result) => result.score >= 0.5);
+
+    console.log(`   Filtered by relevance (>=50%): ${accessibleResults.length} → ${relevantResults.length}`);
+
     // Return top K results with formatted data
-    const formattedResults = accessibleResults.slice(0, topK).map((result) => ({
+    const formattedResults = relevantResults.slice(0, topK).map((result) => ({
       messageId: result.id,
       score: result.score,
       conversationId: result.metadata.conversationId,

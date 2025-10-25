@@ -52,6 +52,26 @@ struct ConversationsListView: View {
                 .navigationTitle("Messages")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showSmartSearch = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("AI Search")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(UIStyleGuide.Colors.primary)
+                            .clipShape(Capsule())
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
                             showCreateGroup = true
@@ -67,19 +87,6 @@ struct ConversationsListView: View {
                         }
                         .buttonStyle(.plain)
                         .buttonBorderShape(.capsule)
-                    }
-                }
-                .searchable(
-                    text: .constant(""),
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Search all messages with AI"
-                )
-                .onSubmit(of: .search) {
-                    showSmartSearch = true
-                }
-                .onChange(of: searchTextBinding.wrappedValue) { _, newValue in
-                    if !newValue.isEmpty {
-                        showSmartSearch = true
                     }
                 }
                 .sheet(isPresented: $showSmartSearch) {
