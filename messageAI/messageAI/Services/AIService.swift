@@ -484,6 +484,74 @@ class AIService: ObservableObject {
         }
     }
 
+    // MARK: - Proactive Assistant
+
+    /// Confirm a proactive scheduling suggestion
+    /// - Parameters:
+    ///   - suggestionId: The ID of the suggestion to confirm
+    ///   - timeSlot: The selected time slot
+    func confirmSuggestion(suggestionId: String, timeSlot: TimeSlot) async throws {
+        guard auth.currentUser != nil else {
+            let error = NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "You must be signed in to use AI features"])
+            print("❌ [AIService] User not authenticated")
+            throw error
+        }
+
+        guard checkRateLimit() else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Rate limit exceeded"])
+        }
+
+        guard !suggestionId.isEmpty else {
+            throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Suggestion ID cannot be empty"])
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            let userId = auth.currentUser?.uid ?? "unknown"
+            print("📅 [AIService] User authenticated: \(userId)")
+
+            print("📅 [AIService] Confirming suggestion: \(suggestionId)")
+
+            // Convert TimeSlot to dictionary for Cloud Function
+            let timeSlotData: [String: Any] = [
+                "startTime": timeSlot.startTime.ISO8601Format(),
+                "duration": timeSlot.duration,
+                "timezoneDisplays": timeSlot.timezoneDisplays
+            ]
+
+            let params: [String: Any] = [
+                "suggestionId": suggestionId,
+                "timeSlot": timeSlotData
+            ]
+
+            let result = try await functions.httpsCallable("confirmSuggestion").call(params)
+
+            guard let data = result.data as? [String: Any] else {
+                throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response format"])
+            }
+
+            let success = data["success"] as? Bool ?? false
+            if !success {
+                let message = data["message"] as? String ?? "Failed to confirm suggestion"
+                throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
+            }
+
+            print("✅ [AIService] Suggestion confirmed successfully")
+
+        } catch {
+            let errorMsg = handleError(error)
+            errorMessage = errorMsg
+            print("❌ [AIService] Suggestion confirmation failed: \(errorMsg)")
+            throw error
+        }
+    }
+
     // MARK: - Test Function
 
     /// Test Cloud Functions connection

@@ -14,6 +14,7 @@ struct ChatView: View {
     @State private var hasInitialized = false
     @StateObject private var viewModelWrapper = ChatViewModelWrapper()
     @StateObject private var aiService = AIService()
+    @StateObject private var proactiveService = ProactiveAssistantService()
     @State private var showSummary = false
     @State private var currentSummary: Summary?
     @State private var isSummarizing = false
@@ -23,6 +24,8 @@ struct ChatView: View {
     @State private var isExtractingDecisions = false
     @State private var showDecisionsAlert = false
     @State private var extractedDecisionsCount = 0
+    @State private var showProactiveSuggestion = false
+    @State private var currentSuggestion: ProactiveSuggestion?
 
     let conversationId: String
     let localStorageService: LocalStorageService?
@@ -51,6 +54,11 @@ struct ChatView: View {
                 VStack(spacing: 0) {
                     // Messages List
                     messagesList
+
+                    // Proactive Suggestion
+                    if let suggestion = proactiveService.activeSuggestions.first {
+                        proactiveSuggestionBanner(suggestion)
+                    }
 
                     // Typing Indicator
                     if !viewModel.typingUsers.isEmpty {
@@ -170,9 +178,12 @@ struct ChatView: View {
             if let vm = viewModel {
                 await vm.onAppear()
             }
+            // Start listening for proactive suggestions
+            proactiveService.startListening(for: conversationId)
         }
         .onDisappear {
             viewModel?.onDisappear()
+            proactiveService.stopListening()
         }
         .alert("Error", isPresented: .constant(viewModel?.errorMessage != nil)) {
             Button("OK") {
@@ -197,6 +208,120 @@ struct ChatView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Successfully tracked \(extractedDecisionsCount) decision\(extractedDecisionsCount == 1 ? "" : "s"). Check the Decisions tab to view them.")
+        }
+        .sheet(isPresented: $showProactiveSuggestion) {
+            if let suggestion = currentSuggestion {
+                ProactiveSuggestionView(
+                    suggestion: suggestion,
+                    onAccept: { timeSlot in
+                        Task {
+                            await acceptSuggestion(suggestion, timeSlot: timeSlot)
+                        }
+                    },
+                    onDismiss: {
+                        Task {
+                            await dismissSuggestion(suggestion)
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Proactive Suggestion
+
+    private func proactiveSuggestionBanner(_ suggestion: ProactiveSuggestion) -> some View {
+        Button {
+            currentSuggestion = suggestion
+            showProactiveSuggestion = true
+        } label: {
+            HStack(spacing: UIStyleGuide.Spacing.md) {
+                // Icon
+                Text("🤖")
+                    .font(.system(size: 32))
+
+                // Content
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AI Scheduling Assistant")
+                        .font(UIStyleGuide.Typography.bodyBold)
+                        .foregroundColor(UIStyleGuide.Colors.textPrimary)
+
+                    Text(suggestion.purpose)
+                        .font(UIStyleGuide.Typography.bodySmall)
+                        .foregroundColor(UIStyleGuide.Colors.textSecondary)
+                        .lineLimit(1)
+
+                    if let timeSlots = suggestion.suggestedTimeSlots, !timeSlots.isEmpty {
+                        Text("\(timeSlots.count) time slots suggested")
+                            .font(UIStyleGuide.Typography.caption)
+                            .foregroundColor(UIStyleGuide.Colors.primary)
+                    } else {
+                        Text("Finding available times...")
+                            .font(UIStyleGuide.Typography.caption)
+                            .foregroundColor(UIStyleGuide.Colors.textTertiary)
+                    }
+                }
+
+                Spacer()
+
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(UIStyleGuide.Colors.textTertiary)
+            }
+            .padding(UIStyleGuide.Spacing.md)
+            .background(UIStyleGuide.Colors.primary.opacity(0.1))
+            .cornerRadius(UIStyleGuide.CornerRadius.medium)
+            .overlay(
+                RoundedRectangle(cornerRadius: UIStyleGuide.CornerRadius.medium)
+                    .stroke(UIStyleGuide.Colors.primary, lineWidth: 2)
+            )
+        }
+        .padding(.horizontal, UIStyleGuide.Spacing.md)
+        .padding(.top, UIStyleGuide.Spacing.sm)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func acceptSuggestion(_ suggestion: ProactiveSuggestion, timeSlot: TimeSlot) async {
+        do {
+            print("✅ [ChatView] Accepting suggestion with time slot")
+            try await proactiveService.acceptSuggestion(suggestion, timeSlot: timeSlot)
+
+            // Call Cloud Function to create calendar event
+            try await aiService.confirmSuggestion(
+                suggestionId: suggestion.id ?? "",
+                timeSlot: timeSlot
+            )
+
+            showProactiveSuggestion = false
+            currentSuggestion = nil
+
+            // Show success message
+            if let viewModel = viewModel {
+                viewModel.errorMessage = nil // Clear any errors
+            }
+
+            print("✅ [ChatView] Meeting scheduled successfully")
+        } catch {
+            print("❌ [ChatView] Failed to accept suggestion: \(error.localizedDescription)")
+            if let viewModel = viewModel {
+                viewModel.errorMessage = "Failed to schedule meeting. Please try again."
+            }
+        }
+    }
+
+    private func dismissSuggestion(_ suggestion: ProactiveSuggestion) async {
+        do {
+            print("❌ [ChatView] Dismissing suggestion")
+            try await proactiveService.dismissSuggestion(suggestion)
+            showProactiveSuggestion = false
+            currentSuggestion = nil
+            print("✅ [ChatView] Suggestion dismissed")
+        } catch {
+            print("❌ [ChatView] Failed to dismiss suggestion: \(error.localizedDescription)")
+            if let viewModel = viewModel {
+                viewModel.errorMessage = "Failed to dismiss suggestion. Please try again."
+            }
         }
     }
 

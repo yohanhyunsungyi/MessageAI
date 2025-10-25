@@ -16,6 +16,7 @@ const { summarizeConversation } = require("./src/features/summarization");
 const { extractActionItems } = require("./src/features/actionItems");
 const { extractDecisions } = require("./src/features/decisions");
 const { parseAndExecuteCommand } = require("./src/features/nlCommands");
+const { confirmSuggestion: confirmSuggestionFn } = require("./src/features/proactive/confirmSuggestion");
 const { withRateLimit } = require("./src/middleware/rateLimit");
 
 /**
@@ -502,5 +503,56 @@ exports.aiAssistant = functions.https.onCall(
         );
       }
     }, "ai-assistant"),
+);
+
+/**
+ * Confirm Proactive Scheduling Suggestion
+ * Accept a scheduling suggestion and create calendar event
+ * Call from iOS: functions.httpsCallable("confirmSuggestion").call({ suggestionId: "...", timeSlot: {...} })
+ */
+exports.confirmSuggestion = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to confirm suggestions",
+        );
+      }
+
+      const { suggestionId, timeSlot } = data;
+
+      if (!suggestionId || typeof suggestionId !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "suggestionId is required and must be a string",
+        );
+      }
+
+      if (!timeSlot || typeof timeSlot !== "object") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "timeSlot is required and must be an object",
+        );
+      }
+
+      console.log(`📅 Confirm suggestion request from user: ${context.auth.uid}`);
+      console.log(`   Suggestion: ${suggestionId}`);
+
+      try {
+        const result = await confirmSuggestionFn(data, context);
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ Confirm suggestion error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to confirm suggestion",
+        );
+      }
+    }, "confirm-suggestion"),
 );
 
