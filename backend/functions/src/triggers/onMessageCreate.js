@@ -76,9 +76,11 @@ async function classifyPriority(messageData, context, messageRef) {
           .get();
       if (convSnap.exists) {
         const convData = convSnap.data();
-        const participants = convData.participantNames;
+        // participantNames is an object { userId: name }, not an array
+        const participantNames = convData.participantNames || {};
+        const namesList = Object.values(participantNames);
         conversationName = convData.name ||
-          (participants ? participants.join(", ") : "") ||
+          (namesList.length > 0 ? namesList.join(", ") : "") ||
           "";
       }
     } catch (err) {

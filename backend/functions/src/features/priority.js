@@ -3,7 +3,7 @@
  * Analyzes message urgency in real-time
  */
 
-const { getChatCompletion } = require("../ai/openai");
+const { openai, DEFAULT_MODEL } = require("../ai/openai");
 const { PRIORITY_CLASSIFICATION_PROMPT } = require("../ai/prompts");
 
 /**
@@ -29,16 +29,17 @@ ${conversationInfo}
 `;
 
     // Call OpenAI for fast classification
-    const response = await getChatCompletion([
-      { role: "system", content: PRIORITY_CLASSIFICATION_PROMPT },
-      { role: "user", content: messageContent },
-    ], {
-      model: "gpt-4-turbo-preview", // Fast model
+    const completion = await openai.chat.completions.create({
+      model: DEFAULT_MODEL,
+      messages: [
+        { role: "system", content: PRIORITY_CLASSIFICATION_PROMPT },
+        { role: "user", content: messageContent },
+      ],
       temperature: 0.3, // Lower temperature for consistent classification
       max_tokens: 50, // We only need one word: critical, high, or normal
     });
 
-    const classification = response.choices[0].message.content.trim().toLowerCase();
+    const classification = completion.choices[0].message.content.trim().toLowerCase();
 
     // Validate classification
     const validPriorities = ["critical", "high", "normal"];
