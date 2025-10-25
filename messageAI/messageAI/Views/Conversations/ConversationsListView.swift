@@ -295,11 +295,10 @@ struct ConversationsListView: View {
                 Spacer()
             }
             .padding(UIStyleGuide.Spacing.md)
-            .background(UIStyleGuide.Colors.primary)
         }
         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
         .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
+        .listRowBackground(UIStyleGuide.Colors.primary)
     }
 
     // MARK: - Helper Methods
