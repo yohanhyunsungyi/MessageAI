@@ -25,6 +25,11 @@ async function parseAndExecuteCommand(userMessage, userId, context = {}) {
   const startTime = Date.now();
 
   try {
+    // Check if OpenAI is configured
+    if (!openai) {
+      throw new Error("OpenAI client not initialized. Please configure API key.");
+    }
+
     // Step 1: Parse intent using LLM
     const intentResponse = await openai.chat.completions.create({
       model: DEFAULT_MODEL,
@@ -106,8 +111,15 @@ async function parseAndExecuteCommand(userMessage, userId, context = {}) {
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ Command parsing failed after ${duration}ms:`, error);
-    throw error;
+    console.error(`❌ Command parsing failed after ${duration}ms`);
+    console.error(`   Error name: ${error.name}`);
+    console.error(`   Error message: ${error.message}`);
+    console.error(`   Error stack:`, error.stack);
+
+    // Re-throw with more context
+    const enhancedError = new Error(`AI Assistant error: ${error.message}`);
+    enhancedError.originalError = error;
+    throw enhancedError;
   }
 }
 
@@ -115,10 +127,26 @@ async function parseAndExecuteCommand(userMessage, userId, context = {}) {
  * Handle summarization request
  */
 async function handleSummarization(intent, userId) {
-  const { conversationId, messageLimit } = intent.parameters;
+  const admin = require("firebase-admin");
+  let { conversationId, messageLimit } = intent.parameters;
 
+  // If no conversation ID specified, try to get the user's latest conversation
   if (!conversationId) {
-    throw new Error("No conversation ID specified. Please specify which conversation to summarize.");
+    console.log(`   No conversation ID specified, fetching latest conversation for user`);
+
+    const conversationsSnap = await admin.firestore()
+        .collection("conversations")
+        .where("participantIds", "array-contains", userId)
+        .orderBy("lastMessageTimestamp", "desc")
+        .limit(1)
+        .get();
+
+    if (conversationsSnap.empty) {
+      throw new Error("No conversations found. Please send some messages first!");
+    }
+
+    conversationId = conversationsSnap.docs[0].id;
+    console.log(`   Using latest conversation: ${conversationId}`);
   }
 
   return await summarizeConversation(conversationId, userId, messageLimit || 200);
@@ -128,10 +156,26 @@ async function handleSummarization(intent, userId) {
  * Handle action items extraction
  */
 async function handleActionItems(intent, userId) {
-  const { conversationId, messageLimit } = intent.parameters;
+  const admin = require("firebase-admin");
+  let { conversationId, messageLimit } = intent.parameters;
 
+  // If no conversation ID specified, try to get the user's latest conversation
   if (!conversationId) {
-    throw new Error("No conversation ID specified. Please specify which conversation to analyze.");
+    console.log(`   No conversation ID specified, fetching latest conversation for user`);
+
+    const conversationsSnap = await admin.firestore()
+        .collection("conversations")
+        .where("participantIds", "array-contains", userId)
+        .orderBy("lastMessageTimestamp", "desc")
+        .limit(1)
+        .get();
+
+    if (conversationsSnap.empty) {
+      throw new Error("No conversations found. Please send some messages first!");
+    }
+
+    conversationId = conversationsSnap.docs[0].id;
+    console.log(`   Using latest conversation: ${conversationId}`);
   }
 
   return await extractActionItems(conversationId, userId, messageLimit || 200);
@@ -158,10 +202,26 @@ async function handleSearch(intent, userId) {
  * Handle decisions extraction
  */
 async function handleDecisions(intent, userId) {
-  const { conversationId, messageLimit } = intent.parameters;
+  const admin = require("firebase-admin");
+  let { conversationId, messageLimit } = intent.parameters;
 
+  // If no conversation ID specified, try to get the user's latest conversation
   if (!conversationId) {
-    throw new Error("No conversation ID specified. Please specify which conversation to analyze.");
+    console.log(`   No conversation ID specified, fetching latest conversation for user`);
+
+    const conversationsSnap = await admin.firestore()
+        .collection("conversations")
+        .where("participantIds", "array-contains", userId)
+        .orderBy("lastMessageTimestamp", "desc")
+        .limit(1)
+        .get();
+
+    if (conversationsSnap.empty) {
+      throw new Error("No conversations found. Please send some messages first!");
+    }
+
+    conversationId = conversationsSnap.docs[0].id;
+    console.log(`   Using latest conversation: ${conversationId}`);
   }
 
   return await extractDecisions(conversationId, userId, messageLimit || 200);
@@ -169,24 +229,58 @@ async function handleDecisions(intent, userId) {
 
 /**
  * List user's action items
+ * NOTE: Currently assignee is stored as a display name (string), not userId
+ * So we fetch all pending items and let the client filter by user
+ * TODO: Update action item extraction to store assignee as userId for proper filtering
  */
 async function listUserActionItems(userId) {
   const admin = require("firebase-admin");
 
+  console.log(`   Fetching action items for user: ${userId}`);
+
+  // Get user's display name to match against assignee field
+  let userDisplayName = null;
+  try {
+    const userDoc = await admin.firestore().collection("users").doc(userId).get();
+    if (userDoc.exists) {
+      userDisplayName = userDoc.data().displayName;
+      console.log(`   User display name: ${userDisplayName}`);
+    }
+  } catch (error) {
+    console.warn(`   Could not fetch user display name: ${error.message}`);
+  }
+
+  // Fetch all pending action items (can't filter by assignee since it's a name, not userId)
   const actionItemsSnap = await admin.firestore()
       .collection("actionItems")
-      .where("assignee", "==", userId)
       .where("status", "==", "pending")
-      .orderBy("priority", "desc")
-      .limit(10)
+      .limit(50)
       .get();
+
+  console.log(`   Found ${actionItemsSnap.size} pending action items total`);
 
   const actionItems = [];
   actionItemsSnap.forEach((doc) => {
-    actionItems.push({ id: doc.id, ...doc.data() });
+    const data = doc.data();
+    // If we have the user's display name, try to filter by it
+    // Otherwise, include all items (better to show too many than none)
+    if (!userDisplayName || data.assignee === userDisplayName || data.assignee === "unassigned") {
+      actionItems.push({ id: doc.id, ...data });
+    }
   });
 
-  return actionItems;
+  console.log(`   Filtered to ${actionItems.length} items for this user`);
+
+  // Sort by priority in-memory (high > medium > low)
+  const priorityOrder = { high: 3, medium: 2, low: 1 };
+  actionItems.sort((a, b) => {
+    const aPriority = priorityOrder[a.priority] || 0;
+    const bPriority = priorityOrder[b.priority] || 0;
+    return bPriority - aPriority;
+  });
+
+  // Return top 10
+  return actionItems.slice(0, 10);
 }
 
 /**

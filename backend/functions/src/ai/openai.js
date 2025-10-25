@@ -27,8 +27,12 @@ if (apiKey) {
 
 /**
  * Default model configuration
+ * Using gpt-4o-mini for faster responses and lower cost
+ * - 2-5x faster than gpt-4-turbo
+ * - 60x cheaper
+ * - Excellent for summarization, extraction, and chat tasks
  */
-const DEFAULT_MODEL = "gpt-4-turbo-preview";
+const DEFAULT_MODEL = "gpt-4o-mini";
 const EMBEDDING_MODEL = "text-embedding-3-small";
 
 /**

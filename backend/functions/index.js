@@ -483,6 +483,7 @@ exports.aiAssistant = functions.https.onCall(
 
       console.log(`🤖 AI Assistant request from user: ${context.auth.uid}`);
       console.log(`   Message: "${message}"`);
+      console.log(`   [DEBUG] nlCommands fix deployed v2`);
 
       try {
         const result = await parseAndExecuteCommand(
