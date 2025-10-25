@@ -238,22 +238,67 @@ struct ConversationsListView: View {
     // MARK: - Conversations List View
 
     private func conversationsListView(viewModel: ConversationsViewModel) -> some View {
-        List(viewModel.filteredConversations, id: \.id) { conversation in
-            NavigationLink(value: conversation.id) {
-                ConversationRowView(
-                    conversation: conversation,
-                    displayName: viewModel.getConversationName(conversation),
-                    subtitle: viewModel.getConversationSubtitle(conversation),
-                    photoURL: viewModel.getConversationPhotoURL(conversation),
-                    unreadCount: 0 // TODO: Calculate actual unread count from MessageService
-                )
+        List {
+            // AI Assistant - Special row always at top
+            aiAssistantRow
+
+            // Regular conversations
+            ForEach(viewModel.filteredConversations, id: \.id) { conversation in
+                NavigationLink(value: conversation.id) {
+                    ConversationRowView(
+                        conversation: conversation,
+                        displayName: viewModel.getConversationName(conversation),
+                        subtitle: viewModel.getConversationSubtitle(conversation),
+                        photoURL: viewModel.getConversationPhotoURL(conversation),
+                        unreadCount: 0 // TODO: Calculate actual unread count from MessageService
+                    )
+                }
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
         }
         .listStyle(.plain)
         .background(UIStyleGuide.Colors.background)
+    }
+
+    // MARK: - AI Assistant Row
+
+    private var aiAssistantRow: some View {
+        NavigationLink {
+            AIAssistantChatView()
+        } label: {
+            HStack(spacing: UIStyleGuide.Spacing.md) {
+                // AI Icon - Lucid logo style (black circle with white lightning)
+                ZStack {
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                // Content
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AI Assistant")
+                        .font(UIStyleGuide.Typography.bodyBold)
+                        .foregroundColor(UIStyleGuide.Colors.textPrimary)
+
+                    Text("Ask me anything about your conversations")
+                        .font(UIStyleGuide.Typography.caption)
+                        .foregroundColor(UIStyleGuide.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+            }
+            .padding(UIStyleGuide.Spacing.md)
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(UIStyleGuide.Colors.primary)
     }
 
     // MARK: - Helper Methods

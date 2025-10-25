@@ -180,7 +180,7 @@ struct SmartSearchView: View {
         VStack(spacing: UIStyleGuide.Spacing.lg) {
             Image(systemName: "sparkles.rectangle.stack")
                 .font(.system(size: 64))
-                .foregroundColor(UIStyleGuide.Colors.primary)
+                .foregroundColor(UIStyleGuide.Colors.secondary)
 
             Text("Smart Semantic Search")
                 .font(UIStyleGuide.Typography.title2)
@@ -291,7 +291,7 @@ private struct FeatureRow: View {
         HStack(alignment: .top, spacing: UIStyleGuide.Spacing.md) {
             Image(systemName: icon)
                 .font(.system(size: UIStyleGuide.IconSize.large))
-                .foregroundColor(UIStyleGuide.Colors.primary)
+                .foregroundColor(UIStyleGuide.Colors.secondary)
                 .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 4) {

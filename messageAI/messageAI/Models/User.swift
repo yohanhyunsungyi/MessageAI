@@ -18,4 +18,5 @@ struct User: Codable, Identifiable {
     var lastSeen: Date
     var fcmToken: String?
     var createdAt: Date
+    var timezone: String?       // User's timezone identifier (e.g., "America/Los_Angeles")
 }

@@ -10,11 +10,13 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 // Import AI infrastructure
-const { indexMessageInPinecone, classifyPriority } = require("./src/triggers/onMessageCreate");
+const { indexMessageInPinecone, classifyPriority, detectScheduling } = require("./src/triggers/onMessageCreate");
 const { searchMessages } = require("./src/features/vectorSearch");
 const { summarizeConversation } = require("./src/features/summarization");
 const { extractActionItems } = require("./src/features/actionItems");
 const { extractDecisions } = require("./src/features/decisions");
+const { parseAndExecuteCommand } = require("./src/features/nlCommands");
+const { confirmSuggestion: confirmSuggestionFn } = require("./src/features/proactive/confirmSuggestion");
 const { withRateLimit } = require("./src/middleware/rateLimit");
 
 /**
@@ -42,6 +44,11 @@ exports.sendMessageNotification = functions.firestore
         // This must complete before function ends so action items are created
         await classifyPriority(message, context, snap.ref).catch((error) => {
           console.error(`⚠️ Priority classification failed: ${error.message}`);
+        });
+
+        // Detect scheduling needs (non-blocking, best-effort)
+        detectScheduling(message, context).catch((error) => {
+          console.error(`⚠️ Scheduling detection failed: ${error.message}`);
         });
 
         // Get conversation to find recipients
@@ -448,5 +455,105 @@ exports.extractDecisions = functions.https.onCall(
         );
       }
     }, "decision-tracking"),
+);
+
+/**
+ * AI Assistant - Natural Language Command Interface
+ * Parse user's natural language query and execute appropriate AI feature
+ * Call from iOS: functions.httpsCallable("aiAssistant").call({ message: "..." })
+ */
+exports.aiAssistant = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to use AI assistant",
+        );
+      }
+
+      const { message, context: userContext } = data;
+
+      if (!message || typeof message !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "message is required and must be a string",
+        );
+      }
+
+      console.log(`🤖 AI Assistant request from user: ${context.auth.uid}`);
+      console.log(`   Message: "${message}"`);
+      console.log(`   [DEBUG] nlCommands fix deployed v2`);
+
+      try {
+        const result = await parseAndExecuteCommand(
+            message,
+            context.auth.uid,
+            userContext || {},
+        );
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ AI Assistant error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to process AI assistant request",
+        );
+      }
+    }, "ai-assistant"),
+);
+
+/**
+ * Confirm Proactive Scheduling Suggestion
+ * Accept a scheduling suggestion and create calendar event
+ * Call from iOS: functions.httpsCallable("confirmSuggestion").call({ suggestionId: "...", timeSlot: {...} })
+ */
+exports.confirmSuggestion = functions.https.onCall(
+    withRateLimit(async (data, context) => {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Must be authenticated to confirm suggestions",
+        );
+      }
+
+      const { suggestionId, timeSlot } = data;
+
+      if (!suggestionId || typeof suggestionId !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "suggestionId is required and must be a string",
+        );
+      }
+
+      if (!timeSlot || typeof timeSlot !== "object") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "timeSlot is required and must be an object",
+        );
+      }
+
+      console.log(`📅 Confirm suggestion request from user: ${context.auth.uid}`);
+      console.log(`   Suggestion: ${suggestionId}`);
+
+      try {
+        const result = await confirmSuggestionFn(data, context);
+
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error) {
+        console.error(`❌ Confirm suggestion error:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Failed to confirm suggestion",
+        );
+      }
+    }, "confirm-suggestion"),
 );
 

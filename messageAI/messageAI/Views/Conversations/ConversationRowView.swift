@@ -73,6 +73,7 @@ struct ConversationRowView: View {
                     }
                 }
             }
+
         }
         .padding(.vertical, UIStyleGuide.Spacing.sm)
         .padding(.horizontal, UIStyleGuide.Spacing.md)
